@@ -10,5 +10,3 @@
 # reproduce, distribute copies to the public, prepare derivative works, and
 # perform publicly and display publicly, and to permit others to do so.
 #################################################################################
-
-from .metric_data import ImpactMetrics, EfficiencyMetrics
