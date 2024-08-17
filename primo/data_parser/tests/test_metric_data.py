@@ -204,7 +204,7 @@ def test_set_of_metrics_class():
 
     # Test for receiving check_update error
     with pytest.raises(
-        ValueError, match=("Sum of weights of primary metrics does not add upto 100")
+        ValueError, match=("Sum of weights of primary metrics does not add up to 100")
     ):
         z.set_value({"met_1": 33, "met_2": 30})
 
@@ -222,7 +222,7 @@ def test_set_of_metrics_class():
     with pytest.raises(
         ValueError,
         match=(
-            "Sum of weights of submetrics of the primary metric met_1 does not add upto 100."
+            "Sum of weights of submetrics of the primary metric met_1 does not add up to 100."
         ),
     ):
         z.set_value(
@@ -382,12 +382,11 @@ def test_efficiency_metrics_class():
     assert hasattr(ef_wt, "num_wells")
     assert hasattr(ef_wt, "num_unique_owners")
     assert hasattr(ef_wt, "dist_centroid")
-    assert hasattr(ef_wt, "avg_dist_road")
     assert hasattr(ef_wt, "elevation_delta")
     assert hasattr(ef_wt, "age_range")
-    assert hasattr(ef_wt, "avg_age")
     assert hasattr(ef_wt, "depth_range")
-    assert hasattr(ef_wt, "avg_depth")
+    assert hasattr(ef_wt, "record_completeness")
+    assert len(ef_wt.get_primary_metrics) == 7
 
     ef_wt.set_value(
         {

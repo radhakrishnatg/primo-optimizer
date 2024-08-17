@@ -253,16 +253,8 @@ SUPP_EFF_METRICS = {
         name="depth_range",
         full_name="Depth Range [ft]",
     ),
-    "avg_dist_road": _SupportedContent(
-        name="avg_dist_road",
-        full_name="Average Distance to Road [miles]",
-    ),
-    "avg_age": _SupportedContent(
-        name="avg_age",
-        full_name="Average Age [Years]",
-    ),
-    "avg_depth": _SupportedContent(
-        name="avg_depth",
-        full_name="Average Depth [ft]",
+    "record_completeness": _SupportedContent(
+        name="record_completeness",
+        full_name="Record Completeness",
     ),
 }

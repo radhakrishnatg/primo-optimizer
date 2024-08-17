@@ -468,7 +468,7 @@ class SetOfMetrics:
         )
 
         if abs(primary_metric_sum - 100) > 0.01:
-            raise ValueError("Sum of weights of primary metrics does not add upto 100")
+            raise ValueError("Sum of weights of primary metrics does not add up to 100")
 
         for key, val in self.get_submetrics.items():
             sub_metric_sum = sum(sub_val.value for sub_val in val.values())
@@ -484,7 +484,7 @@ class SetOfMetrics:
             if parent_metric.value > 0 and abs(sub_metric_sum - 100) > 0.01:
                 raise ValueError(
                     f"Sum of weights of submetrics of the primary metric {key} "
-                    f"does not add upto 100."
+                    f"does not add up to 100."
                 )
 
     def build_widget(self, increments=5):
