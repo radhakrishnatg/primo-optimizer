@@ -12,3 +12,4 @@
 #################################################################################
 
 from .metric_data import ImpactMetrics, EfficiencyMetrics
+from .well_data_column_names import WellDataColumnNames
