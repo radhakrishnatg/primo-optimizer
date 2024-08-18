@@ -64,8 +64,8 @@ class WellDataColumnNames:
     well_type: Union[str, None] = None
     ann_gas_production: Union[str, None] = None
     ann_oil_production: Union[str, None] = None
-    five_yr_gas_production: Union[str, None] = None
-    five_yr_oil_production: Union[str, None] = None
+    five_year_gas_production: Union[str, None] = None
+    five_year_oil_production: Union[str, None] = None
     life_gas_production: Union[str, None] = None
     life_oil_production: Union[str, None] = None
 
@@ -122,7 +122,7 @@ class WellDataColumnNames:
         im_wt = impact_metrics
 
         for obj in im_wt:
-            if not hasattr(im_wt, "_required_data"):
+            if not hasattr(obj, "_required_data"):
                 # This is not a supported metric, so continue
                 LOGGER.warning(
                     f"Metric/submetric {obj.name}/{obj.full_name} is not supported. "
@@ -144,7 +144,7 @@ class WellDataColumnNames:
                 if col_name is None:
                     raise AttributeError(
                         f"Weight of the metric {obj.name} is nonzero, so attribute "
-                        f"{obj._required_Data} is an essential input in the "
+                        f"{obj._required_data} is an essential input in the "
                         f"WellDataColumnNames object."
                     )
 
