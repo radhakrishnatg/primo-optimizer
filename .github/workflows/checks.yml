@@ -6,6 +6,14 @@ name: Checks
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
+    types:
+      - opened
+      # ready_for_review occurs when a draft PR is turned to non-draft
+      - ready_for_review
+      # synchronize occurs whenever commits are pushed to the PR branch
+      - synchronize
 
 defaults:
   run:
@@ -59,8 +67,13 @@ jobs:
         if: matrix.cov-report
         run: echo PYTEST_ADDOPTS="$PYTEST_ADDOPTS --cov --cov-report=xml" >> $GITHUB_ENV
       - name: Run pytest
+        # Skip tests that require API Keys (Secrets) when pull request is opened
         run: |
-          pytest -v
+          if [ ${{ github.event_name }} == 'pull_request' ]; then
+            pytest -v -m "not secrets"
+          else
+            pytest -v
+          fi
       - name: Upload coverage report as job artifact
         if: matrix.cov-report
         uses: actions/upload-artifact@v4
@@ -69,6 +82,26 @@ jobs:
           path: coverage.xml
           if-no-files-found: error
 
+  upload-codecov:
+    name: Upload coverage to Codecov
+    needs: [pytest]
+    runs-on: ubuntu-latest
+    steps:
+      # the checkout step is needed to have access to codecov.yml
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          verbose: true
+          # NOTE: secrets are not available for pull_request workflows
+          # However, as of 2024-02-10, Codecov is still allowing tokenless upload from PRs
+          # but does require token for other workflows e.g. merge to `main`
+          # see https://github.com/codecov/codecov-action/issues/1274#issuecomment-1934437359
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   black:
     name: Run Black to verify that committed code is formatted
