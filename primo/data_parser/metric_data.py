@@ -13,6 +13,7 @@
 
 # Standard libs
 import logging
+from typing import Union
 
 # Installed libs
 import numpy as np
@@ -29,7 +30,7 @@ from primo.utils.raise_exception import raise_exception
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable = protected-access
+# pylint: disable = protected-access, logging-fstring-interpolation
 # pylint: disable = too-many-arguments
 # pylint: disable = too-many-instance-attributes
 class Metric:
@@ -39,11 +40,11 @@ class Metric:
 
     def __init__(
         self,
-        name,
-        value,
-        min_value=0,
-        max_value=100,
-        full_name=None,
+        name: str,
+        weight: int,
+        min_weight: int = 0,
+        max_weight: int = 100,
+        full_name: Union[str, None] = None,
     ) -> None:
         """
         Returns a `Metric` object
@@ -54,14 +55,14 @@ class Metric:
             Short name of the metric.
             Must be a valid python variable name
 
-        value : float
+        weight : int
             Weight associated with the metric
 
-        min_value : float, default = 0
-            Lower bound on metric value
+        min_weight : int, default = 0
+            Lower bound on metric weight
 
-        max_value : float, default = 100
-            Upper bound on metric value
+        max_weight : int, default = 100
+            Upper bound on metric weight
 
         full_name : str, default = None
             Elaborate name of the metric
@@ -70,16 +71,16 @@ class Metric:
         ------
         ValueError
             If an invalid python variable name is provided,
-            If `value` lies outside the bounds,
+            If `weight` lies outside the bounds,
             If an attempt is made to overwrite `name`
         """
 
         self.name = name
         self.full_name = name if full_name is None else full_name
         self.is_submetric = False
-        self.min_value = min_value
-        self.max_value = max_value
-        self.value = value
+        self.min_weight = min_weight
+        self.max_weight = max_weight
+        self.weight = weight
         # Name of the column that contains the data
         # needed for calculating priority score
         self.data_col_name = None
@@ -89,8 +90,8 @@ class Metric:
     def __str__(self) -> str:
         """Format for printing the object"""
         return (
-            f"Metric name: {self.full_name}, Metric value: {self.value} \n"
-            f"    Admissible range: [{self.min_value}, {self.max_value}]"
+            f"Metric name: {self.full_name}, Metric weight: {self.weight} \n"
+            f"    Admissible range: [{self.min_weight}, {self.max_weight}]"
         )
 
     @property
@@ -117,30 +118,37 @@ class Metric:
         self._name = val
 
     @property
-    def value(self):
-        """Getter for attribute `value`"""
-        return self._value
+    def weight(self):
+        """Getter for attribute `weight`"""
+        return self._weight
 
-    @value.setter
-    def value(self, val):
-        """Setter for attribute `value`"""
-        if self.min_value <= val and val <= self.max_value:
-            self._value = val
+    @weight.setter
+    def weight(self, val):
+        """Setter for attribute `weight`"""
+        if not isinstance(val, int):
+            LOGGER.warning(
+                f"Received {val}, a non-integer value for weight. "
+                f"Rounding it to {round(val)}, the nearest integer value."
+            )
+            val = round(val)
+
+        if self.min_weight <= val <= self.max_weight:
+            self._weight = val
             return
 
         msg = (
             f"Attempted to assign {val} for metric {self.name}, which "
             f"lies outside the admissible range "
-            f"[{self.min_value}, {self.max_value}]."
+            f"[{self.min_weight}, {self.max_weight}]."
         )
         raise_exception(msg, ValueError)
 
     @property
-    def weight(self):
-        """Getter for attribute `weight`"""
-        # NOTE: For primary metrics, weight = value. But for submetrics,
-        # weight = (value / 100) * parent_metric.weight
-        return self._value
+    def effective_weight(self):
+        """Getter for attribute `effective_weight`"""
+        # NOTE: For primary metrics, effective_weight = weight. But for submetrics,
+        # effective_weight = (weight / 100) * parent_metric.weight
+        return self._weight
 
     @property
     def score_col_name(self):
@@ -148,7 +156,9 @@ class Metric:
         if self._score_col_name is not None or self.data_col_name is None:
             return self._score_col_name
 
-        self._score_col_name = self.data_col_name + f" Score [0-{self.weight}]"
+        self._score_col_name = (
+            self.data_col_name + f" Score [0-{self.effective_weight}]"
+        )
         return self._score_col_name
 
 
@@ -159,12 +169,12 @@ class SubMetric(Metric):
 
     def __init__(
         self,
-        name,
-        parent_metric,
-        value,
-        min_value=0,
-        max_value=100,
-        full_name=None,
+        name: str,
+        parent_metric: Metric,
+        weight: int,
+        min_weight: int = 0,
+        max_weight: int = 100,
+        full_name: Union[str, None] = None,
     ) -> None:
         """
         Returns a `SubMetric` object
@@ -178,14 +188,14 @@ class SubMetric(Metric):
         parent_metric : Metric
             Parent metric object
 
-        value : float
+        weight : int
             Weight associated with the metric
 
-        min_value : float, default = 0
-            Lower bound on metric value
+        min_weight : int, default = 0
+            Lower bound on metric weight
 
-        max_value : float, default = 100
-            Upper bound on metric value
+        max_weight : int, default = 100
+            Upper bound on metric weight
 
         full_name : str, default = None
             Elaborate name of the metric
@@ -194,26 +204,26 @@ class SubMetric(Metric):
         ------
         ValueError
             If an invalid python variable name is provided,
-            If `value` lies outside the bounds,
+            If `weight` lies outside the bounds,
             If an attempt is made to overwrite `name`
         """
 
-        super().__init__(name, value, min_value, max_value, full_name)
+        super().__init__(name, weight, min_weight, max_weight, full_name)
         self.is_submetric = True
         self.parent_metric = parent_metric
 
     def __str__(self) -> str:
         """Format for printing objects"""
         return (
-            f"Submetric name: {self.full_name}, Submetric value: {self.value} \n"
-            f"    Admissible range: [{self.min_value}, {self.max_value}] \n"
+            f"Submetric name: {self.full_name}, Submetric weight: {self.weight} \n"
+            f"    Admissible range: [{self.min_weight}, {self.max_weight}] \n"
             f"    Is a submetric of {self.parent_metric.full_name}"
         )
 
     @property
-    def weight(self):
-        """Getter for attribute `weight`"""
-        return (self.value / 100) * self.parent_metric.weight
+    def effective_weight(self):
+        """Getter for attribute `effective_weight`"""
+        return (self.weight / 100) * self.parent_metric.weight
 
 
 class SetOfMetrics:
@@ -252,16 +262,16 @@ class SetOfMetrics:
         Nicely formats the output when the object is printed.
         """
         _index = []
-        data = {"Metric Name": [], "Metric Value": []}
+        data = {"Metric Name": [], "Metric weight": []}
 
         for obj in self.get_primary_metrics.values():
             _index.append(obj.name)
             data["Metric Name"].append(obj.full_name)
-            data["Metric Value"].append(obj.value)
+            data["Metric weight"].append(obj.weight)
 
         _index.append("")
         data["Metric Name"].append("Total")
-        data["Metric Value"].append(sum(data["Metric Value"]))
+        data["Metric weight"].append(sum(data["Metric weight"]))
 
         output = str(pd.DataFrame(data, columns=list(data.keys()), index=_index))
 
@@ -272,16 +282,16 @@ class SetOfMetrics:
             output += f"\n\n\nPrimary metric {obj.full_name}, with weight {obj.weight},"
             output += " has submetrics:\n" + ("=" * 80) + "\n"
             _index = []
-            data = {"Submetric Name": [], "Submetric Value": []}
+            data = {"Submetric Name": [], "Submetric weight": []}
 
             for sub_obj in obj.submetrics.values():
                 _index.append(sub_obj.name)
                 data["Submetric Name"].append(sub_obj.full_name)
-                data["Submetric Value"].append(sub_obj.value)
+                data["Submetric weight"].append(sub_obj.weight)
 
             _index.append("")
             data["Submetric Name"].append("Total")
-            data["Submetric Value"].append(sum(data["Submetric Value"]))
+            data["Submetric weight"].append(sum(data["Submetric weight"]))
 
             output += str(pd.DataFrame(data, columns=list(data.keys()), index=_index))
 
@@ -318,7 +328,7 @@ class SetOfMetrics:
 
         return _extended_metrics
 
-    def register_new_metric(self, name, value=0, full_name=None):
+    def register_new_metric(self, name, weight=0, full_name=None):
         """
         Registers a new metric
 
@@ -327,13 +337,13 @@ class SetOfMetrics:
         name : str
             Metric name, must be a valid python variable name
 
-        value : float
-            Value associated with the metric
+        weight : int
+            weight associated with the metric
 
         full_name : str
             Elaborate name of the metric
         """
-        setattr(self, name, Metric(name=name, value=value, full_name=full_name))
+        setattr(self, name, Metric(name=name, weight=weight, full_name=full_name))
 
     def delete_metric(self, name):
         """
@@ -359,7 +369,7 @@ class SetOfMetrics:
 
         delattr(self, obj.name)
 
-    def register_new_submetric(self, name, parent_metric, value=0, full_name=None):
+    def register_new_submetric(self, name, parent_metric, weight=0, full_name=None):
         """
         Registers a new submetric
 
@@ -371,8 +381,8 @@ class SetOfMetrics:
         parent_name : Metric
             Parent metric object
 
-        value : float
-            Value associated with the metric
+        weight : int
+            weight associated with the metric
 
         full_name : str
             Elaborate name of the metric
@@ -383,7 +393,7 @@ class SetOfMetrics:
             SubMetric(
                 name=name,
                 parent_metric=parent_metric,
-                value=value,
+                weight=weight,
                 full_name=full_name,
             ),
         )
@@ -419,7 +429,7 @@ class SetOfMetrics:
         if len(parent_obj.submetrics) == 0:
             delattr(parent_obj, "submetrics")
 
-    def set_value(self, primary_metrics, submetrics=None, check_validity=True):
+    def set_weight(self, primary_metrics, submetrics=None, check_validity=True):
         """
         Sets/updates the weights of all metrics/submetrics.
 
@@ -454,7 +464,7 @@ class SetOfMetrics:
 
         for key, obj in _extended_metrics.items():
             if key in primary_metrics:
-                obj.value = primary_metrics.pop(key)
+                obj.weight = primary_metrics.pop(key)
 
         # If there are any unused elements, raise an error.
         if len(primary_metrics) > 0:
@@ -483,25 +493,25 @@ class SetOfMetrics:
             )
 
         for key, val in self.get_submetrics.items():
-            sub_metric_sum = sum(sub_val.value for sub_val in val.values())
+            sub_metric_sum = sum(sub_val.weight for sub_val in val.values())
 
             parent_metric = getattr(self, key)
             # If parent metric is inactive, then sum must be zero
-            if parent_metric.value == 0 and not np.isclose(sub_metric_sum, 0):
+            if parent_metric.weight == 0 and not np.isclose(sub_metric_sum, 0):
                 msg = (
                     f"Weight of the primary metric {key} is zero, but the sum of "
                     f"weights of its submetrics is {sub_metric_sum}, which is nonzero."
                 )
                 raise_exception(msg, ValueError)
 
-            if parent_metric.value > 0 and not np.isclose(sub_metric_sum, 100):
+            if parent_metric.weight > 0 and not np.isclose(sub_metric_sum, 100):
                 msg = (
                     f"Sum of weights of submetrics of the primary metric {key} "
                     f"does not add up to 100."
                 )
                 raise_exception(msg, ValueError)
 
-    def build_widget(self, increments=5):
+    def build_widget(self, increments=1):
         """
         Builds a widget to for visualizing and updating metrics
 
@@ -521,9 +531,9 @@ class SetOfMetrics:
             _from_widget_labels[key] = obj
 
             widget_data[key] = {
-                "default": obj.value,
-                "min_val": obj.min_value,
-                "max_val": obj.max_value,
+                "default": obj.weight,
+                "min_val": obj.min_weight,
+                "max_val": obj.max_weight,
                 "incr": increments,
             }
 
@@ -540,9 +550,9 @@ class SetOfMetrics:
                 _from_widget_labels[sub_key] = sub_obj
 
                 widget_data[key]["sub_weights"][sub_key] = {
-                    "default": sub_obj.value,
-                    "min_val": sub_obj.min_value,
-                    "max_val": sub_obj.max_value,
+                    "default": sub_obj.weight,
+                    "min_val": sub_obj.min_weight,
+                    "max_val": sub_obj.max_weight,
                     "incr": increments,
                 }
 
@@ -556,9 +566,9 @@ class SetOfMetrics:
 
         return _widget
 
-    def set_value_from_widget(self, widget_obj):
+    def set_weight_from_widget(self, widget_obj):
         """
-        Updates the value from the widget to the data object
+        Updates the weight from the widget to the data object
 
         Parameters
         ----------
@@ -573,9 +583,9 @@ class SetOfMetrics:
 
         for key, obj in widget_obj._from_widget_labels.items():
             if key in priority_weights:
-                obj.value = priority_weights[key]
+                obj.weight = priority_weights[key]
             else:
-                obj.value = 0
+                obj.weight = 0
 
         self.check_validity()
 
