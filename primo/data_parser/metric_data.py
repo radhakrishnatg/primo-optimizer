@@ -13,14 +13,18 @@
 
 # Standard libs
 import logging
+
+# Installed libs
+import numpy as np
 import pandas as pd
 
 # User-defined libs
-from primo.utils.config_utils import UserPriorities
 from primo.data_parser.default_data import (
-    SUPP_IMPACT_METRICS,
     SUPP_EFF_METRICS,
+    SUPP_IMPACT_METRICS,
 )
+from primo.utils.config_utils import UserPriorities
+from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
 
@@ -98,15 +102,17 @@ class Metric:
     def name(self, val):
         """Setter for attribute `name`"""
         if hasattr(self, "_name"):
-            raise ValueError(
-                "Metric's key name cannot be modified " "after it is defined."
+            raise_exception(
+                "Metric's key name cannot be modified after it is defined.",
+                ValueError,
             )
 
         if not val.isidentifier():
-            raise ValueError(
+            msg = (
                 f"Received {val} for Metric's key name, "
                 f"which is not a valid python variable name!"
             )
+            raise_exception(msg, ValueError)
 
         self._name = val
 
@@ -122,11 +128,12 @@ class Metric:
             self._value = val
             return
 
-        raise ValueError(
+        msg = (
             f"Attempted to assign {val} for metric {self.name}, which "
             f"lies outside the admissible range "
             f"[{self.min_value}, {self.max_value}]."
         )
+        raise_exception(msg, ValueError)
 
     @property
     def weight(self):
@@ -225,16 +232,18 @@ class SetOfMetrics:
 
     def __setattr__(self, name, value):
         if not isinstance(value, Metric):
-            raise TypeError(
+            msg = (
                 f"Attributes of {self.__class__.__name__} must be instances of Metric. "
                 f"Attempted to register {value}."
             )
+            raise_exception(msg, TypeError)
 
         if name in self:
-            raise ValueError(
+            msg = (
                 f"Metric/submetric {name} has already been registered. "
                 f"Attempting to register a new metric with the same name."
             )
+            raise_exception(msg, ValueError)
 
         return super().__setattr__(name, value)
 
@@ -280,7 +289,7 @@ class SetOfMetrics:
 
     def items(self):
         """
-        Retrives metric names and the associated metric objects
+        Retrieves metric names and the associated metric objects
         """
         return self.__dict__.items()
 
@@ -340,7 +349,7 @@ class SetOfMetrics:
 
         # Raise an error if the metric does not exist
         if obj is None:
-            raise AttributeError(f"Metric/submetric {name} does not exist.")
+            raise_exception(f"Metric/submetric {name} does not exist.", AttributeError)
 
         # If submetrics exist, delete all submetrics too
         sub_obj_list = [*obj.submetrics.values()] if hasattr(obj, "submetrics") else []
@@ -400,7 +409,7 @@ class SetOfMetrics:
 
         # Raise an error if the metric does not exist
         if obj is None:
-            raise AttributeError(f"Submetric {name} does not exist.")
+            raise_exception(f"Submetric {name} does not exist.", AttributeError)
 
         parent_obj = obj.parent_metric
         parent_obj.submetrics.pop(obj.name)
@@ -449,8 +458,9 @@ class SetOfMetrics:
 
         # If there are any unused elements, raise an error.
         if len(primary_metrics) > 0:
-            raise KeyError(
-                f"Metrics/submetrics {[*primary_metrics]} are not recognized/registered."
+            raise_exception(
+                f"Metrics/submetrics {[*primary_metrics]} are not recognized/registered.",
+                KeyError,
             )
 
         # Check validity of the data
@@ -467,25 +477,29 @@ class SetOfMetrics:
             obj.weight for obj in self.get_primary_metrics.values()
         )
 
-        if abs(primary_metric_sum - 100) > 0.01:
-            raise ValueError("Sum of weights of primary metrics does not add up to 100")
+        if not np.isclose(primary_metric_sum, 100):
+            raise_exception(
+                "Sum of weights of primary metrics does not add up to 100", ValueError
+            )
 
         for key, val in self.get_submetrics.items():
             sub_metric_sum = sum(sub_val.value for sub_val in val.values())
 
             parent_metric = getattr(self, key)
             # If parent metric is inactive, then sum must be zero
-            if parent_metric.value == 0 and abs(sub_metric_sum) > 0.001:
-                raise ValueError(
+            if parent_metric.value == 0 and not np.isclose(sub_metric_sum, 0):
+                msg = (
                     f"Weight of the primary metric {key} is zero, but the sum of "
                     f"weights of its submetrics is {sub_metric_sum}, which is nonzero."
                 )
+                raise_exception(msg, ValueError)
 
-            if parent_metric.value > 0 and abs(sub_metric_sum - 100) > 0.01:
-                raise ValueError(
+            if parent_metric.value > 0 and not np.isclose(sub_metric_sum, 100):
+                msg = (
                     f"Sum of weights of submetrics of the primary metric {key} "
                     f"does not add up to 100."
                 )
+                raise_exception(msg, ValueError)
 
     def build_widget(self, increments=5):
         """

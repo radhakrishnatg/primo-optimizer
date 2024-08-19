@@ -16,11 +16,11 @@ import pytest
 
 # User-defined libs
 from primo.data_parser.metric_data import (
-    Metric,
-    SubMetric,
-    SetOfMetrics,
-    ImpactMetrics,
     EfficiencyMetrics,
+    ImpactMetrics,
+    Metric,
+    SetOfMetrics,
+    SubMetric,
 )
 
 
@@ -269,7 +269,7 @@ def test_set_of_metrics_class():
     assert not hasattr(z, "sub_met_3_1")
 
     # Test for receiving error when deleting a metric that does not exist
-    with pytest.raises(AttributeError, match=("Submetric sub_met_3_1 does not exist.")):
+    with pytest.raises(AttributeError, match="Submetric sub_met_3_1 does not exist."):
         z.delete_submetric("sub_met_3_1")
 
 
