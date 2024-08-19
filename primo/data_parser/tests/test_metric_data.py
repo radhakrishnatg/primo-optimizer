@@ -387,6 +387,11 @@ def test_impact_metrics_class():
 
     assert im_wt.check_validity() is None
 
+    im_widget = im_wt.build_widget()
+    im_widget.confirm_weights(None)
+    im_wt.set_weight_from_widget(im_widget)
+    assert im_wt.check_validity() is None
+
 
 def test_efficiency_metrics_class():
     ef_wt = EfficiencyMetrics()
