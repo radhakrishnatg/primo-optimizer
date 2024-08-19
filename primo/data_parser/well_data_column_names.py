@@ -18,6 +18,7 @@ from typing import Union
 
 # User-defined libs
 from primo.data_parser import ImpactMetrics
+from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
 
@@ -88,8 +89,15 @@ class WellDataColumnNames:
         """Registers an attribute for a new column"""
         for key, val in col_names.items():
             if key in self:
-                raise AttributeError(
-                    f"Attribute {key} is already defined. Use a different name."
+                raise_exception(
+                    f"Attribute {key} is already defined. Use a different name.",
+                    AttributeError
+                )
+
+            if not key.isidentifier():
+                raise_exception(
+                    f"Key {key} is not a valid python variable name!",
+                    ValueError
                 )
             setattr(self, key, val)
 
@@ -142,11 +150,12 @@ class WellDataColumnNames:
             if isinstance(obj._required_data, str):
                 col_name = getattr(self, obj._required_data)
                 if col_name is None:
-                    raise AttributeError(
+                    msg = (
                         f"Weight of the metric {obj.name} is nonzero, so attribute "
                         f"{obj._required_data} is an essential input in the "
                         f"WellDataColumnNames object."
                     )
+                    raise_exception(msg, AttributeError)
 
                 # Column name is specified, so continue to the next metric
                 # Register the column name in Metric object
@@ -159,7 +168,8 @@ class WellDataColumnNames:
             # the data production volume data
             for col in obj._required_data:
                 if getattr(self, col) is None:
-                    raise AttributeError(
+                    msg = (
                         f"Weight of the metric {obj.name} is nonzero, so attribute "
                         f"{col} is an essential input in the WellDataColumnNames object."
                     )
+                    raise_exception(msg, AttributeError)

@@ -75,6 +75,12 @@ def test_well_data_column_names():
     ):
         wcn.register_new_columns({"new_col_1": "New Column 1"})
 
+    with pytest.raises(
+        ValueError,
+        match="Key new col 3 is not a valid python variable name!"
+    ):
+        wcn.register_new_columns({"new col 3": "New Column 3"})
+
 
 @pytest.fixture(scope="module")
 def get_well_data_cols():
