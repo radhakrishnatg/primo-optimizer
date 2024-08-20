@@ -11,31 +11,26 @@
 # perform publicly and display publicly, and to permit others to do so.
 #################################################################################
 
+# Standard libs
 import datetime
 import logging
-from .solvers import get_solver, check_optimal_termination
+
+# User-defined libs
+from primo.data_parser.default_data import (
+    BING_MAPS_BASE_URL,
+    CENSUS_YEAR,
+    CONVERSION_FACTOR,
+    EARTH_RADIUS,
+    START_COORDINATES as Start_coordinates,
+)
+from primo.utils.solvers import get_solver, check_optimal_termination
 
 LOGGER_FORMAT = "%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"
 LOGGER_DATE = "%d-%b-%y %H:%M:%S"
 
-BING_MAPS_BASE_URL = "http://dev.virtualearth.net/REST/V1/Routes/Driving"
-
-
-# TODO: Find a way for a user to pass this
-CENSUS_YEAR = 2020
-
 LOGGER = logging.getLogger(__name__)
 
-EARTH_RADIUS = 3959.0  # Earth's radius in Miles
-
-Start_coordinates = (
-    40.44,
-    -79.94,
-)  # fixed start coordinates in elevation util to get nearest road point
-
-
-CONVERSION_FACTOR = 5.614583  # convert bbl/year to mcf/year
-
+# pylint: disable = logging-fstring-interpolation
 # Ensure that census year is as recent as possible
 if datetime.date.today().year - CENSUS_YEAR > 10:
     LOGGER.warning(f"Package is using {CENSUS_YEAR} CENSUS Data by default")

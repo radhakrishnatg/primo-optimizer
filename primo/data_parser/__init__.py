@@ -11,5 +11,5 @@
 # perform publicly and display publicly, and to permit others to do so.
 #################################################################################
 
-from .metric_data import ImpactMetrics, EfficiencyMetrics
+from .metric_data import EfficiencyMetrics, ImpactMetrics
 from .well_data_column_names import WellDataColumnNames

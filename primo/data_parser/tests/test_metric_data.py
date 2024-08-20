@@ -11,33 +11,38 @@
 # perform publicly and display publicly, and to permit others to do so.
 #################################################################################
 
+# Standard libs
+import logging
+
 # Installed libs
 import pytest
 
 # User-defined libs
 from primo.data_parser.metric_data import (
-    Metric,
-    SubMetric,
-    SetOfMetrics,
-    ImpactMetrics,
     EfficiencyMetrics,
+    ImpactMetrics,
+    Metric,
+    SetOfMetrics,
+    SubMetric,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 # pylint: disable = no-member, missing-function-docstring
 # pylint: disable = f-string-without-interpolation
 # pylint: disable = protected-access, unused-variable
 # pylint: disable = too-many-statements
-def test_metric_class():
-    z = Metric(name="met_1", value=50, full_name="Metric One")
+def test_metric_class(caplog):
+    z = Metric(name="met_1", weight=50, full_name="Metric One")
 
     assert z.name == "met_1"
     assert z.full_name == "Metric One"
-    assert (z.min_value, z.value, z.max_value) == (0, 50, 100)
-    assert z.weight == 50
+    assert (z.min_weight, z.weight, z.max_weight) == (0, 50, 100)
+    assert z.effective_weight == 50
     assert not z.is_submetric
     print_format = (
-        f"Metric name: Metric One, Metric value: 50 \n"
+        f"Metric name: Metric One, Metric weight: 50 \n"
         f"    Admissible range: [0, 100]"
     )
     assert str(z) == print_format
@@ -64,7 +69,7 @@ def test_metric_class():
     ):
         y = Metric("met 2", 100)
 
-    # Add test to capture the value out-of-range error
+    # Add test to capture the weight out-of-range error
     with pytest.raises(
         ValueError,
         match=(
@@ -72,7 +77,14 @@ def test_metric_class():
             f"lies outside the admissible range \\[0, 100\\]."
         ),
     ):
-        z.value = -50
+        z.weight = -50
+
+    # Test warning for assigning non-integer value
+    z.weight = 50.7
+    assert (
+        "Received 50.7, a non-integer value for weight. "
+        "Rounding it to 51, the nearest integer value."
+    ) in caplog.text
 
 
 def test_submetric_class():
@@ -81,9 +93,9 @@ def test_submetric_class():
 
     assert z_sub.is_submetric
     assert z_sub.parent_metric is z_par
-    assert z_sub.weight == 20
+    assert z_sub.effective_weight == 20
     print_format = (
-        "Submetric name: SubMetric One, Submetric value: 50 \n"
+        "Submetric name: SubMetric One, Submetric weight: 50 \n"
         "    Admissible range: [0, 100] \n"
         "    Is a submetric of Parent Metric One"
     )
@@ -98,11 +110,11 @@ def test_set_of_metrics_class():
     z.register_new_metric("met_3", 34, "Metric Three")
 
     print_format = (
-        "        Metric Name  Metric Value\n"
-        "met_1    Metric One            33\n"
-        "met_2    Metric Two            33\n"
-        "met_3  Metric Three            34\n"
-        "              Total           100"
+        "        Metric Name  Metric weight\n"
+        "met_1    Metric One             33\n"
+        "met_2    Metric Two             33\n"
+        "met_3  Metric Three             34\n"
+        "              Total            100"
     )
 
     assert str(z) == print_format
@@ -113,23 +125,23 @@ def test_set_of_metrics_class():
     z.register_new_submetric("sub_met_3_2", z.met_3, 75, "Sub Metric Three-Two")
 
     print_format = (
-        "        Metric Name  Metric Value\n"
-        "met_1    Metric One            33\n"
-        "met_2    Metric Two            33\n"
-        "met_3  Metric Three            34\n"
-        "              Total           100\n\n\n"
+        "        Metric Name  Metric weight\n"
+        "met_1    Metric One             33\n"
+        "met_2    Metric Two             33\n"
+        "met_3  Metric Three             34\n"
+        "              Total            100\n\n\n"
         "Primary metric Metric One, with weight 33, has submetrics:\n"
         "================================================================================\n"
-        "                 Submetric Name  Submetric Value\n"
-        "sub_met_1_1  Sub Metric One-One               50\n"
-        "sub_met_1_2  Sub Metric One-Two               50\n"
-        "                          Total              100\n\n\n"
+        "                 Submetric Name  Submetric weight\n"
+        "sub_met_1_1  Sub Metric One-One                50\n"
+        "sub_met_1_2  Sub Metric One-Two                50\n"
+        "                          Total               100\n\n\n"
         "Primary metric Metric Three, with weight 34, has submetrics:\n"
         "================================================================================\n"
-        "                   Submetric Name  Submetric Value\n"
-        "sub_met_3_1  Sub Metric Three-One               25\n"
-        "sub_met_3_2  Sub Metric Three-Two               75\n"
-        "                            Total              100"
+        "                   Submetric Name  Submetric weight\n"
+        "sub_met_3_1  Sub Metric Three-One                25\n"
+        "sub_met_3_2  Sub Metric Three-Two                75\n"
+        "                            Total               100"
     )
 
     assert str(z) == print_format
@@ -200,13 +212,13 @@ def test_set_of_metrics_class():
         KeyError,
         match=("Metrics/submetrics \\['met 1'\\] are not recognized/registered."),
     ):
-        z.set_value({"met 1": 33, "Metric Two": 33})
+        z.set_weight({"met 1": 33, "Metric Two": 33})
 
     # Test for receiving check_update error
     with pytest.raises(
         ValueError, match=("Sum of weights of primary metrics does not add up to 100")
     ):
-        z.set_value({"met_1": 33, "met_2": 30})
+        z.set_weight({"met_1": 33, "met_2": 30})
 
     # Test for receiving check_update error
     with pytest.raises(
@@ -216,7 +228,7 @@ def test_set_of_metrics_class():
             "weights of its submetrics is 100, which is nonzero."
         ),
     ):
-        z.set_value({"met_1": 0, "met_2": 66})
+        z.set_weight({"met_1": 0, "met_2": 66})
 
     # Test for receiving check_update error
     with pytest.raises(
@@ -225,11 +237,11 @@ def test_set_of_metrics_class():
             "Sum of weights of submetrics of the primary metric met_1 does not add up to 100."
         ),
     ):
-        z.set_value(
+        z.set_weight(
             {"met_1": 33, "met_2": 33}, submetrics={"met_1": {"sub_met_1_1": 0}}
         )
 
-    z.set_value({"sub_met_1_1": 50})
+    z.set_weight({"sub_met_1_1": 50})
 
     # Test for receiving error raised when registering non-Metric instances
     with pytest.raises(
@@ -256,7 +268,7 @@ def test_set_of_metrics_class():
     assert not hasattr(z, "met_1")
     assert not hasattr(z, "sub_met_1_1")
     assert not hasattr(z, "sub_met_1_2")
-    assert len([obj for obj in z]) == 4
+    assert len(list(z)) == 4
 
     # Test for receiving error when deleting a metric that does not exist
     with pytest.raises(
@@ -269,7 +281,7 @@ def test_set_of_metrics_class():
     assert not hasattr(z, "sub_met_3_1")
 
     # Test for receiving error when deleting a metric that does not exist
-    with pytest.raises(AttributeError, match=("Submetric sub_met_3_1 does not exist.")):
+    with pytest.raises(AttributeError, match="Submetric sub_met_3_1 does not exist."):
         z.delete_submetric("sub_met_3_1")
 
 
@@ -344,7 +356,7 @@ def test_impact_metrics_class():
     assert not hasattr(im_wt.well_count, "submetrics")
     assert not hasattr(im_wt.well_integrity, "submetrics")
 
-    im_wt.set_value(
+    im_wt.set_weight(
         primary_metrics={
             "ch4_emissions": 25,
             "sensitive_receptors": 30,
@@ -375,6 +387,11 @@ def test_impact_metrics_class():
 
     assert im_wt.check_validity() is None
 
+    im_widget = im_wt.build_widget()
+    im_widget.confirm_weights(None)
+    im_wt.set_weight_from_widget(im_widget)
+    assert im_wt.check_validity() is None
+
 
 def test_efficiency_metrics_class():
     ef_wt = EfficiencyMetrics()
@@ -388,7 +405,7 @@ def test_efficiency_metrics_class():
     assert hasattr(ef_wt, "record_completeness")
     assert len(ef_wt.get_primary_metrics) == 7
 
-    ef_wt.set_value(
+    ef_wt.set_weight(
         {
             "num_wells": 20,
             "dist_centroid": 30,

@@ -12,4 +12,4 @@
 #################################################################################
 
 # Optimization Feasibility tolerance
-FEASIBILITY_TOLERANCE = 1e-6
+from primo.data_parser.default_data import FEASIBILITY_TOLERANCE
