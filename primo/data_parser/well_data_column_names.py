@@ -91,13 +91,12 @@ class WellDataColumnNames:
             if key in self:
                 raise_exception(
                     f"Attribute {key} is already defined. Use a different name.",
-                    AttributeError
+                    AttributeError,
                 )
 
             if not key.isidentifier():
                 raise_exception(
-                    f"Key {key} is not a valid python variable name!",
-                    ValueError
+                    f"Key {key} is not a valid python variable name!", ValueError
                 )
             setattr(self, key, val)
 
