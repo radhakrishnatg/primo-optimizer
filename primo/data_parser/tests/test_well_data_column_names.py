@@ -97,7 +97,7 @@ def get_well_data_cols():
 
     # Now, the object has five metrics
     # Set weights for all metrics
-    im_mt.set_value(
+    im_mt.set_weight(
         {
             "ch4_emissions": 20,
             "dac_impact": 20,
@@ -231,7 +231,7 @@ def test_missing_col_error(get_well_data_cols):
 
     wcn.ann_oil_production = "Oil [bbl/yr]"
 
-    im_mt.set_value(
+    im_mt.set_weight(
         {
             "ann_production_volume": 50,
             "five_year_production_volume": 50,

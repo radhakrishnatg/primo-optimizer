@@ -142,7 +142,7 @@ class WellDataColumnNames:
 
             # For supported metrics, skip if there is no essential data requirement,
             # or if the weight of the metric is zero.
-            if obj._required_data is None or obj.value == 0:
+            if obj._required_data is None or obj.weight == 0:
                 continue
 
             # This is a supported metric with a nonzero weight. Raise an error if the
