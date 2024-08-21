@@ -69,15 +69,12 @@ def test_well_data_column_names():
 
     with pytest.raises(
         AttributeError,
-        match=(
-        f"Attribute new_col_1 is already defined. Use a different name."
-        )
+        match=(f"Attribute new_col_1 is already defined. Use a different name."),
     ):
         wcn.register_new_columns({"new_col_1": "New Column 1"})
 
     with pytest.raises(
-        ValueError,
-        match="Key new col 3 is not a valid python variable name!"
+        ValueError, match="Key new col 3 is not a valid python variable name!"
     ):
         wcn.register_new_columns({"new col 3": "New Column 3"})
 
@@ -104,7 +101,6 @@ def get_well_data_cols():
             "sensitive_receptors": 20,
             "production_volume": 20,
             "well_integrity": 20,
-
             # submetrics
             "leak": 50,
             "compliance": 50,
