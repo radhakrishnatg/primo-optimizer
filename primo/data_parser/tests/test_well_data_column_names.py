@@ -41,27 +41,28 @@ def test_well_data_column_names():
     assert wcn.age == "Age [Years]"
     assert wcn.depth == "Depth [ft]"
 
-    # Testing contains and keys methods
+    # Testing contains, keys, and values methods
     for key in cols:
         assert key in wcn
-        assert key in wcn.keys()
+
+    assert wcn.keys() == cols
+    assert wcn.values() == [
+        "Well API",
+        "Latitude",
+        "Longitude",
+        "Age [Years]",
+        "Depth [ft]",
+    ]
 
     # Testing items method
     for key, val in wcn.items():
-        if key not in cols:
-            assert val is None
+        assert key in cols
+        assert val is not None
 
     # Testing iter method
     for key in wcn:
         if key not in cols:
             assert getattr(wcn, key) is None
-
-    # Testing values method
-    assert "Well API" in wcn.values()
-    assert "Latitude" in wcn.values()
-    assert "Longitude" in wcn.values()
-    assert "Age [Years]" in wcn.values()
-    assert "Depth [ft]" in wcn.values()
 
     # Test register new column method
     wcn.register_new_columns({"new_col_1": "New Column 1"})
@@ -79,8 +80,8 @@ def test_well_data_column_names():
         wcn.register_new_columns({"new col 3": "New Column 3"})
 
 
-@pytest.fixture(scope="module")
-def get_well_data_cols():
+@pytest.fixture(name="get_well_data_cols", scope="function")
+def get_well_data_cols_fixture():
     im_mt = ImpactMetrics()
     # Work with fewer metrics for convenience
     im_mt.delete_metric("environment")

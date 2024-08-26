@@ -101,16 +101,19 @@ class WellDataColumnNames:
             setattr(self, key, val)
 
     def keys(self):
-        """Returns internal names of the columns"""
-        return self.__dict__.keys()
+        """Returns defined internal names of the columns"""
+        keys = [key for key, val in self.__dict__.items() if val is not None]
+        return keys
 
     def values(self):
-        """Returns user names of the columns"""
-        return self.__dict__.values()
+        """Returns user names of the columns that are None"""
+        val = [val for val in self.__dict__.values() if val is not None]
+        return val
 
     def items(self):
         """Returns internal-user name pairs"""
-        return self.__dict__.items()
+        data = {key: val for key, val in self.__dict__.items() if val is not None}
+        return data.items()
 
     # pylint: disable = logging-fstring-interpolation
     def check_columns_available(
