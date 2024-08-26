@@ -17,6 +17,7 @@ import os
 
 # Installed libs
 import numpy as np
+import pandas as pd
 import pytest
 
 # User-defined libs
@@ -87,7 +88,7 @@ def get_well_data_from_xlsx_fixture():
 
     filename = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
-        "random_well_data_common.csv",
+        "random_well_data_common.xlsx",
     )
 
     wd = WellData(filename=filename, column_names=col_names)
@@ -107,7 +108,7 @@ def test_excel_reader(get_well_data_from_csv, get_well_data_from_xlsx):
     wd_csv = get_well_data_from_csv
     wd_xlsx = get_well_data_from_xlsx
 
-    assert wd_csv.data.equals(wd_xlsx.data)
+    pd.testing.assert_frame_equal(wd_csv.data, wd_xlsx.data)
     assert wd_csv.data.shape[0] == 50
     assert wd_xlsx.data.shape[0] == 50
 
@@ -192,6 +193,9 @@ def test_drop_incomplete_data(caplog, get_well_data_from_csv):
     assert wd.get_removed_wells_with_reason == {
         "well_id": INCOMPLETE_ROWS["API Well Number"]
     }
+
+    # Test existing dict_key when removing rows
+    wd._removed_rows["x"] = []
 
     wd.drop_incomplete_data(col_names.latitude, "x")
     for i in INCOMPLETE_ROWS["x"]:

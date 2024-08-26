@@ -201,7 +201,7 @@ class WellData:
         )
         removed_rows = [i for i in self.data.index if i not in new_well_data.index]
         if dict_key in self._removed_rows:
-            self._removed_rows[dict_key].append(removed_rows)
+            self._removed_rows[dict_key] += removed_rows
         else:
             self._removed_rows[dict_key] = removed_rows
 
