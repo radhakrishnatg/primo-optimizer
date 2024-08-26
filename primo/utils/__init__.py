@@ -24,9 +24,7 @@ from primo.data_parser.default_data import (
     START_COORDINATES as Start_coordinates,
 )
 from primo.utils.solvers import get_solver, check_optimal_termination
-
-LOGGER_FORMAT = "%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"
-LOGGER_DATE = "%d-%b-%y %H:%M:%S"
+from primo.utils.setup_logger import setup_logger, LogLevel
 
 LOGGER = logging.getLogger(__name__)
 

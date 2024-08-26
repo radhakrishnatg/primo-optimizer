@@ -48,6 +48,7 @@ MAP_PATH_EXPECTED_HARDCODED_DATA_COUNT = {
     "primo/utils/tests/test_estimation_utils.py": 181,
     "primo/utils/tests/test_geo_utils.py": 21,
     "primo/utils/tests/test_kpi_utils.py": 118,
+    "primo/utils/tests/test_logger.py": 3,
     "primo/utils/tests/test_map_utils.py": 124,
     "primo/utils/tests/test_opt_utils.py": 55,
     "primo/utils/tests/test_proximity_utils.py": 26,
