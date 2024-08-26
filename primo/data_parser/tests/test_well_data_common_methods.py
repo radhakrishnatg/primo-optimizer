@@ -135,9 +135,7 @@ def test_dunder_methods(get_well_data_from_csv):
 
     # Testing the __contains__ dunder method
     for col in wd._col_names.values():
-        if col is not None:
-            # TODO: Remove the if condition after updating the values method
-            assert col in wd
+        assert col in wd
 
     # The data file has two additional columns. Ensure that
     # those columns are not read
@@ -145,10 +143,8 @@ def test_dunder_methods(get_well_data_from_csv):
     assert "Distance to Road [miles]" not in wd
 
     # Testing the __iter__ dunder method
-    row_list = list(range(2, 52))
-
-    for r in wd:
-        assert r in row_list
+    # list(wd) generates the list of rows in wd.data
+    assert list(wd) == list(range(2, 52))
 
 
 def test_has_incomplete_data(caplog, get_well_data_from_csv):
