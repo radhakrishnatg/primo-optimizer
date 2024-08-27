@@ -84,7 +84,7 @@ def setup_logger(
         handlers.append(file_handler)
 
     logging.basicConfig(
-        level=logging.INFO,
+        level=supported_log_levels[log_level],
         format=LOGGER_FORMAT,
         datefmt=LOGGER_DATE,
         handlers=handlers,
