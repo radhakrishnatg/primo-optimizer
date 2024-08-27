@@ -22,7 +22,7 @@ import pytest
 from primo.data_parser.input_parser import InputParser
 from primo.opt_model.opt_model import OptModel
 from primo.utils.setup_arg_parser import parse_args
-from primo.utils.setup_logger import setup_logger, LogLevel
+from primo.utils.setup_logger import setup_logger
 
 
 # expected selection
@@ -68,7 +68,6 @@ args = parse_args(
 )
 parser = InputParser(args)
 opt_input = parser.parse_data(mobilization_costs)
-setup_logger(log_level=LogLevel.WARNING, log_to_console=False)
 
 
 @pytest.mark.parametrize(
