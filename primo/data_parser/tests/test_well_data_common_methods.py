@@ -339,7 +339,7 @@ def test_replace_data(caplog, get_well_data_from_csv):
     wd.fill_incomplete_data(col_names.leak, wd.config.fill_leak, "leak_flag")
     assert f"Found empty cells in column {col_names.leak}" in caplog.text
     assert (
-        f"Filling any empty cells in column {col_names.leak} " f"with value {True}."
+        f"Filling any empty cells in column {col_names.leak} with value {False}."
     ) in caplog.text
 
     wd.replace_data(
@@ -367,7 +367,7 @@ def test_convert_data_to_binary(caplog, get_well_data_from_csv):
     wd.fill_incomplete_data(col_names.leak, wd.config.fill_leak, "leak_flag")
     assert f"Found empty cells in column {col_names.leak}" in caplog.text
     assert (
-        f"Filling any empty cells in column {col_names.leak} " f"with value {True}."
+        f"Filling any empty cells in column {col_names.leak} with value {False}."
     ) in caplog.text
 
     wd.convert_data_to_binary(col_names.leak)
