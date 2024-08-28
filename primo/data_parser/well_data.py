@@ -20,8 +20,8 @@ import pandas as pd
 from pyomo.common.config import Bool
 
 # User-defined libs
+from primo.data_parser.options_well_data import WELL_DATA_CONFIG
 from primo.data_parser.well_data_column_names import WellDataColumnNames
-from primo.data_parser.input_options_well_data import WELL_DATA_CONFIG
 from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ class WellData:
 
     @property
     def get_removed_wells(self):
-        """Yields the list of wells removed from the data set"""
+        """Returns the list of wells removed from the data set"""
         row_list = []
 
         for val in self._removed_rows.values():
@@ -131,14 +131,14 @@ class WellData:
     @property
     def get_removed_wells_with_reason(self):
         """
-        Yields the list of wells removed from the data set.
+        Returns the list of wells removed from the data set.
         Keys contain the reason, and the values contain the list of rows removed.
         """
         return self._removed_rows
 
     @property
     def get_flag_columns(self):
-        """Returns all the columns containing"""
+        """Returns all the columns containing flagged wells"""
         return [col for col in self.data.columns if "_flag" in col]
 
     @property
@@ -355,7 +355,7 @@ class WellData:
         Utility to flag a specific set of wells. Useful to record
         wells for which a specific data/metric is estimated.
 
-        wells: list
+        rows: list
             List of rows(wells) in the DataFrame
 
         col_name : str

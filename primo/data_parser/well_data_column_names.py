@@ -62,7 +62,8 @@ class WellDataColumnNames:
     state_wetlands_far: Union[str, None] = None
 
     # Columns for production_volume metric
-    well_type: Union[str, None] = None
+    well_type: Union[str, None] = None  # Oil/Gas Type
+    well_type_by_depth: Union[str, None] = None  # Shallow/Deep Type
     ann_gas_production: Union[str, None] = None
     ann_oil_production: Union[str, None] = None
     five_year_gas_production: Union[str, None] = None
@@ -106,7 +107,7 @@ class WellDataColumnNames:
         return keys
 
     def values(self):
-        """Returns user names of the columns that are None"""
+        """Returns user names of the columns that are not None"""
         val = [val for val in self.__dict__.values() if val is not None]
         return val
 

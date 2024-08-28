@@ -15,7 +15,6 @@
 This module defines all the input options for objects of WellData class
 """
 
-
 # Installed libs
 from pyomo.common.config import (
     Bool,
@@ -27,14 +26,14 @@ from pyomo.common.config import (
 )
 
 # User libs
-from primo.utils.domain_validators import InRange
 from primo.data_parser.default_data import SUPP_IMPACT_METRICS
+from primo.utils.domain_validators import InRange
 
 
 # This dictionary contains default values to fill with,
 # if the data is not provided.
 binary_type_metrics = {
-    "leak": True,  # Well is leaking
+    "leak": False,  # Well is not leaking
     "compliance": True,  # Well is compliant
     "violation": False,  # Well is not in violation
     "incident": False,  # Incident is assumed to be False
@@ -88,8 +87,8 @@ CONFIG.declare(
     "fill_age",
     ConfigValue(
         default=100,
-        # Assuming that no well is older than 250 years
-        domain=InRange(0, 250),
+        # Assuming that no well is older than 350 years
+        domain=InRange(0, 350),
         doc="Value to fill with, if the age is missing",
     ),
 )
@@ -121,7 +120,7 @@ CONFIG.declare(
     ConfigValue(
         default=0,  # Assuming no hospitals nearby
         domain=NonNegativeInt,
-        doc=("Value to fill with, if number of Hospitals nearby " "is not specified"),
+        doc="Value to fill with, if number of Hospitals nearby is not specified",
     ),
 )
 CONFIG.declare(
@@ -129,15 +128,15 @@ CONFIG.declare(
     ConfigValue(
         default=0,  # Assuming no hospitals nearby
         domain=NonNegativeInt,
-        doc=("Value to fill with, if number of Schools nearby " "is not specified"),
+        doc="Value to fill with, if number of Schools nearby is not specified",
     ),
 )
 CONFIG.declare(
     "fill_state_dac",
     ConfigValue(
         default=0.0,
-        domain=NonNegativeFloat,
-        doc=("Value to fill with, if the state DAC information " "is not specified"),
+        domain=InRange(0, 100),
+        doc="Value to fill with, if the state DAC information is not specified",
     ),
 )
 CONFIG.declare(
@@ -184,30 +183,36 @@ CONFIG.declare(
         ),
     ),
 )
-
-# Well data categorization approach
 CONFIG.declare(
-    "well_type_partition",
+    "fill_life_gas_production",
     ConfigValue(
-        default=True,
-        domain=Bool,
-        doc="Partition the well data based on well type: oil/gas",
-    ),
-)
-CONFIG.declare(
-    "depth_threshold",
-    ConfigValue(
-        default=2000.0,
+        default=0.0,
         domain=NonNegativeFloat,
-        doc="Depth value for classifying wells into shallow or deep",
+        doc=(
+            "Value to fill with, if the lifelong gas production [in Mcf] "
+            "is not specified"
+        ),
     ),
 )
 CONFIG.declare(
-    "depth_type_partition",
+    "fill_life_oil_production",
     ConfigValue(
-        default=False,
-        domain=Bool,
-        doc="Partition the well data based on depth: Shallow/Deep",
+        default=0.0,
+        domain=NonNegativeFloat,
+        doc=(
+            "Value to fill with, if the lifelong oil production [in bbl] "
+            "is not specified"
+        ),
+    ),
+)
+CONFIG.declare(
+    "threshold_production_volume",
+    ConfigValue(
+        domain=NonNegativeFloat,
+        doc=(
+            "If specified, wells whose lifelong production volume is "
+            "above the threshold production volume will be removed from the dataset."
+        ),
     ),
 )
 
