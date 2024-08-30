@@ -43,7 +43,7 @@ class _SupportedContent:
     # required columns or not.
     required_data: Union[str, list, None] = None
     # Is the value of this metric inversly proportional to plugging priority?
-    # E.g., Compliance, production volume, well integrity, etc.
+    # E.g., Compliance, production volume, etc.
     has_inverse_priority: bool = False
     fill_missing_value: Union[None, dict] = None
 
@@ -92,12 +92,10 @@ SUPP_IMPACT_METRICS = {
     ),
     "well_integrity": _SupportedContent(
         name="well_integrity",
-        full_name="Is Well Integrity good?",
+        full_name="Well Integrity Issues [Yes/No]",
         required_data="well_integrity",
-        # Priority should be higher if well integrity is not good
-        has_inverse_priority=True,
-        # If it is not specified, assume that the well integrity is good
-        fill_missing_value={"domain": Bool, "default": True},
+        # If it is not specified, assume no well integrity issues
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "environment": _SupportedContent(
         name="environment",
