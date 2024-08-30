@@ -11,25 +11,22 @@
 # perform publicly and display publicly, and to permit others to do so.
 #################################################################################
 
-# Standard libs
-import datetime
-import logging
+# Installed libs
+import pytest
 
 # User-defined libs
-from primo.data_parser.default_data import (
-    BING_MAPS_BASE_URL,
-    CENSUS_YEAR,
-    CONVERSION_FACTOR,
-    EARTH_RADIUS,
-    START_COORDINATES as Start_coordinates,
-)
-from primo.utils.solvers import get_solver, check_optimal_termination
-from primo.utils.setup_logger import setup_logger
+from primo.utils import setup_logger
 
-LOGGER = logging.getLogger(__name__)
 
-# pylint: disable = logging-fstring-interpolation
-# Ensure that census year is as recent as possible
-if datetime.date.today().year - CENSUS_YEAR > 10:
-    LOGGER.warning(f"Package is using {CENSUS_YEAR} CENSUS Data by default")
-    LOGGER.warning("Consider upgrading to newer version")
+def test_logger(tmp_path):
+    """Checks if if the setup_logger function works or not"""
+    # Catch the invalid log-level error
+    with pytest.raises(ValueError):
+        setup_logger(10, False)
+
+    d = tmp_path / "mylog.log"
+    setup_logger(2, True, d)
+
+    # Catch the log file exists error
+    with pytest.raises(ValueError):
+        setup_logger(2, True, d)

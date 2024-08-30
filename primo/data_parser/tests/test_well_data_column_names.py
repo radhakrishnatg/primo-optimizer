@@ -100,7 +100,7 @@ def get_well_data_cols_fixture():
             "ch4_emissions": 20,
             "dac_impact": 20,
             "sensitive_receptors": 20,
-            "production_volume": 20,
+            "ann_production_volume": 20,
             "well_integrity": 20,
             # submetrics
             "leak": 50,
@@ -109,8 +109,8 @@ def get_well_data_cols_fixture():
             "state_dac": 60,
             "hospitals": 50,
             "schools": 50,
-            "ann_production_volume": 100,
-            "five_year_production_volume": 0,
+            "ann_gas_production": 40,
+            "ann_oil_production": 60,
         }
     )
 
@@ -202,46 +202,3 @@ def test_missing_col_error(get_well_data_cols):
         wcn.check_columns_available(im_mt)
 
     wcn.hospitals = "Hospitals"
-    # Now test the list of columns error message
-    wcn.ann_gas_production = None
-
-    with pytest.raises(
-        AttributeError,
-        match=(
-            "Weight of the metric ann_production_volume is nonzero, so attribute "
-            "ann_gas_production is an essential input in the WellDataColumnNames object."
-        ),
-    ):
-        wcn.check_columns_available(im_mt)
-
-    wcn.ann_gas_production = "Gas [Mcf/yr]"
-    wcn.ann_oil_production = None
-
-    with pytest.raises(
-        AttributeError,
-        match=(
-            "Weight of the metric ann_production_volume is nonzero, so attribute "
-            "ann_oil_production is an essential input in the WellDataColumnNames object."
-        ),
-    ):
-        wcn.check_columns_available(im_mt)
-
-    wcn.ann_oil_production = "Oil [bbl/yr]"
-
-    im_mt.set_weight(
-        {
-            "ann_production_volume": 50,
-            "five_year_production_volume": 50,
-        }
-    )
-    assert im_mt.check_validity() is None
-    wcn.five_year_gas_production = "Five-Year Gas [Mcf]"
-
-    with pytest.raises(
-        AttributeError,
-        match=(
-            "Weight of the metric five_year_production_volume is nonzero, so attribute "
-            "five_year_oil_production is an essential input in the WellDataColumnNames object."
-        ),
-    ):
-        wcn.check_columns_available(im_mt)

@@ -163,16 +163,3 @@ class WellDataColumnNames:
                 # Column name is specified, so continue to the next metric
                 # Register the column name in Metric object
                 obj.data_col_name = col_name
-                continue
-
-            # If the code reaches here, then _required_data must be a list.
-            # Currently, this happens only for production_volume metrics
-            # The `data_col_name` attribute will be assigned after processing
-            # the data production volume data
-            for col in obj._required_data:
-                if getattr(self, col) is None:
-                    msg = (
-                        f"Weight of the metric {obj.name} is nonzero, so attribute "
-                        f"{col} is an essential input in the WellDataColumnNames object."
-                    )
-                    raise_exception(msg, AttributeError)

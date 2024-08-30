@@ -68,7 +68,6 @@ args = parse_args(
 )
 parser = InputParser(args)
 opt_input = parser.parse_data(mobilization_costs)
-setup_logger(args.log_file, args.verbose, args.output_to_console)
 
 
 @pytest.mark.parametrize(

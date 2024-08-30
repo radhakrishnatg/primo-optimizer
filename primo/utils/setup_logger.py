@@ -21,22 +21,30 @@ import sys
 
 # User defined libs
 from primo.utils.raise_exception import raise_exception
-from primo.utils import LOGGER_FORMAT, LOGGER_DATE
+
+LOGGER_FORMAT = "%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"
+LOGGER_DATE = "%d-%b-%y %H:%M:%S"
 
 
-def setup_logger(log_file: pathlib.Path, log_level: int, log_to_console: bool):
+def setup_logger(
+    log_level: int = 2,
+    log_to_console: bool = True,
+    log_file: pathlib.Path = pathlib.Path(os.devnull),
+):
     """
     Set up logging objects based on user input.
 
     Parameters
     ----------
-    log_file : pathlib.Path
-        The path on the disk where log files are written; defaults to None
-    log_level : int
+    log_level : int, default = 2
         The level of logging messages---0: off; 1: warning; 2: info; 3: debug;
-    log_to_console : bool
+
+    log_to_console : bool, default = True
         If True, log messages are displayed on the screen in addition
-        to the log file (if configured); defaults to False
+        to the log file (if configured)
+
+    log_file : pathlib.Path, default = pathlib.Path(os.devnull)
+        The path on the disk where log files are written
 
     Returns
     -------
@@ -49,21 +57,15 @@ def setup_logger(log_file: pathlib.Path, log_level: int, log_to_console: bool):
         If the log_file specified already exists or if an invalid value for
         log_level is provided
     """
-    logging_level = logging.DEBUG
-
-    if log_level == 0:
-        # Instead of fully turning off, we only retain critical messages
-        logging_level = logging.CRITICAL
-    elif log_level == 1:
-        logging_level = logging.WARNING
-    elif log_level == 2:
-        logging_level = logging.INFO
-    elif log_level == 3:
-        logging_level = logging.DEBUG
-    else:
+    supported_log_levels = {
+        0: logging.CRITICAL,
+        1: logging.WARNING,
+        2: logging.INFO,
+        3: logging.DEBUG,
+    }
+    if log_level not in supported_log_levels:
         raise_exception(
-            f"Invalid value for log_level: {log_level}. "
-            "Acceptable values are: {0,1,2,3}",
+            f"Invalid value for log_level: {log_level}. Acceptable values are: [0, 1, 2, 3]",
             ValueError,
         )
 
@@ -75,13 +77,14 @@ def setup_logger(log_file: pathlib.Path, log_level: int, log_to_console: bool):
     if log_file != pathlib.Path(os.devnull):
         if os.path.exists(log_file):
             raise_exception(
-                f"Log file: {log_file} already exists. " "Please specify new log file",
+                f"Log file: {str(log_file)} already exists. Please specify new log file.",
                 ValueError,
             )
         file_handler = logging.FileHandler(log_file)
         handlers.append(file_handler)
+
     logging.basicConfig(
-        level=logging_level,
+        level=supported_log_levels[log_level],
         format=LOGGER_FORMAT,
         datefmt=LOGGER_DATE,
         handlers=handlers,
