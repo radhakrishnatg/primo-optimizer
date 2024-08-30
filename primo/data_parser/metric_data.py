@@ -18,6 +18,7 @@ from typing import Union
 # Installed libs
 import numpy as np
 import pandas as pd
+from pyomo.common.config import ConfigValue, Bool
 
 # User-defined libs
 from primo.data_parser.default_data import (
@@ -81,11 +82,28 @@ class Metric:
         self.min_weight = min_weight
         self.max_weight = max_weight
         self.weight = weight
+
+        # Is this a Yes/No or True/False type metric?
+        self.is_binary_type = False
+        # For some metrics, a higher value implies a lower priority for plugging.
+        # Is this one of those metrics? E.g., compliance, production volume, etc.
+        self.has_inverse_priority = False
+
         # Name of the column that contains the data
         # needed for calculating priority score
         self.data_col_name = None
         # Name of the column that contains the priority score
         self._score_col_name = None
+
+        # Value to fill with, if the data needed for the analysis of this metric
+        # is not provided.
+        self._fill_missing_value = ConfigValue(
+            doc=(
+                f"Value to fill with, if {self.full_name} information "
+                f"is not provided"
+            )
+        )
+        self._fill_missing_value._name = self.name
 
     def __str__(self) -> str:
         """Format for printing the object"""
@@ -160,6 +178,43 @@ class Metric:
             self.data_col_name + f" Score [0-{self.effective_weight}]"
         )
         return self._score_col_name
+
+    @property
+    def fill_missing_value(self):
+        """
+        Returns the value to fill with, if the data needed for the analysis of this
+        metric is missing for a well in the dataset.
+        """
+        return self._fill_missing_value.value()
+
+    @fill_missing_value.setter
+    def fill_missing_value(self, value):
+        """Setter for the _fill_missing_value attribute."""
+        self._fill_missing_value.set_value(value)
+
+    def _configure_fill_missing_value(self, domain, default=None):
+        """
+        Sets the domain validator and default value for `fill_missing_value` for
+        supported metrics/submetrics
+
+        Parameters
+        ----------
+        domain : function
+            A valid domain validator function
+
+        default : Any value satisfying the domain, default = None
+            Default value for `fill_missing_value`
+        """
+        # If a domain already exists, and it is being updated, and if the existing non-None
+        # value lies outside the domain, then ConfigValue throws an error.
+        # To avoid this error, first set the value to None before updating the domain
+        self._fill_missing_value.set_value(None)
+        self._fill_missing_value.set_domain(domain)
+        self._fill_missing_value.set_value(default)
+
+        # Set the metric type to be binary if the domain is bool
+        if domain is bool or domain is Bool:
+            self.is_binary_type = True
 
 
 class SubMetric(Metric):
@@ -610,7 +665,11 @@ class ImpactMetrics(SetOfMetrics):
                     full_name=val.full_name,
                 )
 
-            getattr(self, val.name)._required_data = val.required_data
+            metric = getattr(self, val.name)
+            metric._required_data = val.required_data
+            metric.has_inverse_priority = val.has_inverse_priority
+            if val.fill_missing_value is not None:
+                metric._configure_fill_missing_value(**val.fill_missing_value)
 
 
 class EfficiencyMetrics(SetOfMetrics):

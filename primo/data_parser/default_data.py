@@ -15,6 +15,9 @@
 from dataclasses import dataclass
 from typing import Union
 
+# Installed libs
+from pyomo.common.config import Bool, NonNegativeFloat, NonNegativeInt
+
 # This file should contain all the constants
 FEASIBILITY_TOLERANCE = 1e-6  # Optimization Feasibility tolerance
 EARTH_RADIUS = 3959.0  # Earth's radius in Miles
@@ -27,6 +30,7 @@ START_COORDINATES = (40.44, -79.94)
 
 # Set of supported impact metrics along with
 # the required data for the analysis.
+# pylint: disable = too-many-instance-attributes
 @dataclass()
 class _SupportedContent:
     name: str
@@ -38,6 +42,10 @@ class _SupportedContent:
     # This will be used to check if the input data has
     # required columns or not.
     required_data: Union[str, list, None] = None
+    # Is the value of this metric inversly proportional to plugging priority?
+    # E.g., Compliance, production volume, well integrity, etc.
+    has_inverse_priority: bool = False
+    fill_missing_value: Union[None, dict] = None
 
 
 SUPP_IMPACT_METRICS = {
@@ -57,9 +65,14 @@ SUPP_IMPACT_METRICS = {
         full_name="Sensitive Receptors",
         has_submetrics=True,
     ),
-    "production_volume": _SupportedContent(
-        name="production_volume",
-        full_name="Production Volume",
+    "ann_production_volume": _SupportedContent(
+        name="ann_production_volume",
+        full_name="Annual Production Volume",
+        has_submetrics=True,
+    ),
+    "five_year_production_volume": _SupportedContent(
+        name="five_year_production_volume",
+        full_name="Five-year Production Volume",
         has_submetrics=True,
     ),
     "well_age": _SupportedContent(
@@ -79,8 +92,12 @@ SUPP_IMPACT_METRICS = {
     ),
     "well_integrity": _SupportedContent(
         name="well_integrity",
-        full_name="Hazards due to Well Integrity",
+        full_name="Is Well Integrity good?",
         required_data="well_integrity",
+        # Priority should be higher if well integrity is not good
+        has_inverse_priority=True,
+        # If it is not specified, assume that the well integrity is good
+        fill_missing_value={"domain": Bool, "default": True},
     ),
     "environment": _SupportedContent(
         name="environment",
@@ -94,6 +111,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="ch4_emissions",
         required_data="leak",
+        # Assume that the well is not leaking if it not specified
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "compliance": _SupportedContent(
         name="compliance",
@@ -101,6 +120,10 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="ch4_emissions",
         required_data="compliance",
+        # Priority should be higher if the well is not compliant
+        has_inverse_priority=True,
+        # Assuming well is compliant if it is not specified
+        fill_missing_value={"domain": Bool, "default": True},
     ),
     "violation": _SupportedContent(
         name="violation",
@@ -108,6 +131,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="ch4_emissions",
         required_data="violation",
+        # Assuming that the well is not in violation
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "incident": _SupportedContent(
         name="incident",
@@ -115,6 +140,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="ch4_emissions",
         required_data="incident",
+        # Incident is assumed to be False if it is not specified
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     # Submetrics of dac_impact
     "fed_dac": _SupportedContent(
@@ -131,6 +158,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="dac_impact",
         required_data="state_dac",
+        # If it is not specified, set the state DAC priority to zero
+        fill_missing_value={"domain": NonNegativeFloat, "default": 0},
     ),
     # Submetrics of sensitive_recptors
     "hospitals": _SupportedContent(
@@ -139,6 +168,7 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="sensitive_receptors",
         required_data="hospitals",
+        fill_missing_value={"domain": NonNegativeInt, "default": 0},
     ),
     "schools": _SupportedContent(
         name="schools",
@@ -146,6 +176,7 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="sensitive_receptors",
         required_data="schools",
+        fill_missing_value={"domain": NonNegativeInt, "default": 0},
     ),
     "buildings_near": _SupportedContent(
         name="buildings_near",
@@ -153,6 +184,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="sensitive_receptors",
         required_data="buildings_near",
+        # Assuming that no buildings are nearby if it is not specified
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "buildings_far": _SupportedContent(
         name="buildings_far",
@@ -160,6 +193,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="sensitive_receptors",
         required_data="buildings_far",
+        # Assuming no distant buildings
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     # Submetrics of environment
     "fed_wetlands_near": _SupportedContent(
@@ -168,6 +203,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="environment",
         required_data="fed_wetlands_near",
+        # Assuming no nearby federal wetlands
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "fed_wetlands_far": _SupportedContent(
         name="fed_wetlands_far",
@@ -175,6 +212,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="environment",
         required_data="fed_wetlands_far",
+        # Assuming no distant federal wetlands
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "state_wetlands_near": _SupportedContent(
         name="state_wetlands_near",
@@ -182,6 +221,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="environment",
         required_data="state_wetlands_near",
+        # Assuming no nearby state wetlands
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "state_wetlands_far": _SupportedContent(
         name="state_wetlands_far",
@@ -189,27 +230,53 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="environment",
         required_data="state_wetlands_far",
+        # Assuming no distant state wetlands
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     # Submetrics of production_volume
-    "ann_production_volume": _SupportedContent(
-        name="ann_production_volume",
-        full_name="Annual Production Volume",
+    "ann_gas_production": _SupportedContent(
+        name="ann_gas_production",
+        full_name="Annual Gas Production [in Mcf/Year]",
         is_submetric=True,
-        parent_metric="production_volume",
-        required_data=[
-            "ann_gas_production",
-            "ann_oil_production",
-        ],
+        parent_metric="ann_production_volume",
+        required_data="ann_gas_production",
+        # Higher gas production => lower priority for plugging
+        has_inverse_priority=True,
+        # Assuming that well is not producing gas, if it is not specified
+        fill_missing_value={"domain": NonNegativeFloat, "default": 0.0},
     ),
-    "five_year_production_volume": _SupportedContent(
-        name="five_year_production_volume",
-        full_name="Five-year Production Volume",
+    "ann_oil_production": _SupportedContent(
+        name="ann_oil_production",
+        full_name="Annual Oil Production [in bbl/Year]",
         is_submetric=True,
-        parent_metric="production_volume",
-        required_data=[
-            "five_year_gas_production",
-            "five_year_oil_production",
-        ],
+        parent_metric="ann_production_volume",
+        required_data="ann_oil_production",
+        # Higher oil production => lower priority for plugging
+        has_inverse_priority=True,
+        # Assuming that well is not producing oil, if it is not specified
+        fill_missing_value={"domain": NonNegativeFloat, "default": 0.0},
+    ),
+    "five_year_gas_production": _SupportedContent(
+        name="five_year_gas_production",
+        full_name="Five-year Gas Production [in Mcf]",
+        is_submetric=True,
+        parent_metric="five_year_production_volume",
+        required_data="five_year_gas_production",
+        # Higher gas production => lower priority for plugging
+        has_inverse_priority=True,
+        # Assuming that well is not producing gas, if it is not specified
+        fill_missing_value={"domain": NonNegativeFloat, "default": 0.0},
+    ),
+    "five_year_oil_production": _SupportedContent(
+        name="five_year_oil_production",
+        full_name="Five-year Oil Production [in bbl]",
+        is_submetric=True,
+        parent_metric="five_year_production_volume",
+        required_data="five_year_oil_production",
+        # Higher oil production => lower priority for plugging
+        has_inverse_priority=True,
+        # Assuming that well is not producing oil, if it is not specified
+        fill_missing_value={"domain": NonNegativeFloat, "default": 0.0},
     ),
     # Submetrics of other_emissions
     "h2s_leak": _SupportedContent(
@@ -218,6 +285,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="other_emissions",
         required_data="h2s_leak",
+        # Assuming no H2S leak if it is not specified
+        fill_missing_value={"domain": Bool, "default": False},
     ),
     "brine_leak": _SupportedContent(
         name="brine_leak",
@@ -225,6 +294,8 @@ SUPP_IMPACT_METRICS = {
         is_submetric=True,
         parent_metric="other_emissions",
         required_data="brine_leak",
+        # Assuming no brine leak if it is not specified
+        fill_missing_value={"domain": Bool, "default": False},
     ),
 }
 

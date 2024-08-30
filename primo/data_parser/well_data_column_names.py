@@ -62,7 +62,8 @@ class WellDataColumnNames:
     state_wetlands_far: Union[str, None] = None
 
     # Columns for production_volume metric
-    well_type: Union[str, None] = None
+    well_type: Union[str, None] = None  # Oil/Gas Type
+    well_type_by_depth: Union[str, None] = None  # Shallow/Deep Type
     ann_gas_production: Union[str, None] = None
     ann_oil_production: Union[str, None] = None
     five_year_gas_production: Union[str, None] = None
@@ -101,16 +102,19 @@ class WellDataColumnNames:
             setattr(self, key, val)
 
     def keys(self):
-        """Returns internal names of the columns"""
-        return self.__dict__.keys()
+        """Returns defined internal names of the columns"""
+        keys = [key for key, val in self.__dict__.items() if val is not None]
+        return keys
 
     def values(self):
-        """Returns user names of the columns"""
-        return self.__dict__.values()
+        """Returns user names of the columns that are not None"""
+        val = [val for val in self.__dict__.values() if val is not None]
+        return val
 
     def items(self):
         """Returns internal-user name pairs"""
-        return self.__dict__.items()
+        data = {key: val for key, val in self.__dict__.items() if val is not None}
+        return data.items()
 
     # pylint: disable = logging-fstring-interpolation
     def check_columns_available(
@@ -159,16 +163,3 @@ class WellDataColumnNames:
                 # Column name is specified, so continue to the next metric
                 # Register the column name in Metric object
                 obj.data_col_name = col_name
-                continue
-
-            # If the code reaches here, then _required_data must be a list.
-            # Currently, this happens only for production_volume metrics
-            # The `data_col_name` attribute will be assigned after processing
-            # the data production volume data
-            for col in obj._required_data:
-                if getattr(self, col) is None:
-                    msg = (
-                        f"Weight of the metric {obj.name} is nonzero, so attribute "
-                        f"{col} is an essential input in the WellDataColumnNames object."
-                    )
-                    raise_exception(msg, AttributeError)

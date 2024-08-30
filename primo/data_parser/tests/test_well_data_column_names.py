@@ -41,27 +41,28 @@ def test_well_data_column_names():
     assert wcn.age == "Age [Years]"
     assert wcn.depth == "Depth [ft]"
 
-    # Testing contains and keys methods
+    # Testing contains, keys, and values methods
     for key in cols:
         assert key in wcn
-        assert key in wcn.keys()
+
+    assert wcn.keys() == cols
+    assert wcn.values() == [
+        "Well API",
+        "Latitude",
+        "Longitude",
+        "Age [Years]",
+        "Depth [ft]",
+    ]
 
     # Testing items method
     for key, val in wcn.items():
-        if key not in cols:
-            assert val is None
+        assert key in cols
+        assert val is not None
 
     # Testing iter method
     for key in wcn:
         if key not in cols:
             assert getattr(wcn, key) is None
-
-    # Testing values method
-    assert "Well API" in wcn.values()
-    assert "Latitude" in wcn.values()
-    assert "Longitude" in wcn.values()
-    assert "Age [Years]" in wcn.values()
-    assert "Depth [ft]" in wcn.values()
 
     # Test register new column method
     wcn.register_new_columns({"new_col_1": "New Column 1"})
@@ -79,8 +80,8 @@ def test_well_data_column_names():
         wcn.register_new_columns({"new col 3": "New Column 3"})
 
 
-@pytest.fixture(scope="module")
-def get_well_data_cols():
+@pytest.fixture(name="get_well_data_cols", scope="function")
+def get_well_data_cols_fixture():
     im_mt = ImpactMetrics()
     # Work with fewer metrics for convenience
     im_mt.delete_metric("environment")
@@ -99,7 +100,7 @@ def get_well_data_cols():
             "ch4_emissions": 20,
             "dac_impact": 20,
             "sensitive_receptors": 20,
-            "production_volume": 20,
+            "ann_production_volume": 20,
             "well_integrity": 20,
             # submetrics
             "leak": 50,
@@ -108,8 +109,8 @@ def get_well_data_cols():
             "state_dac": 60,
             "hospitals": 50,
             "schools": 50,
-            "ann_production_volume": 100,
-            "five_year_production_volume": 0,
+            "ann_gas_production": 40,
+            "ann_oil_production": 60,
         }
     )
 
@@ -201,46 +202,3 @@ def test_missing_col_error(get_well_data_cols):
         wcn.check_columns_available(im_mt)
 
     wcn.hospitals = "Hospitals"
-    # Now test the list of columns error message
-    wcn.ann_gas_production = None
-
-    with pytest.raises(
-        AttributeError,
-        match=(
-            "Weight of the metric ann_production_volume is nonzero, so attribute "
-            "ann_gas_production is an essential input in the WellDataColumnNames object."
-        ),
-    ):
-        wcn.check_columns_available(im_mt)
-
-    wcn.ann_gas_production = "Gas [Mcf/yr]"
-    wcn.ann_oil_production = None
-
-    with pytest.raises(
-        AttributeError,
-        match=(
-            "Weight of the metric ann_production_volume is nonzero, so attribute "
-            "ann_oil_production is an essential input in the WellDataColumnNames object."
-        ),
-    ):
-        wcn.check_columns_available(im_mt)
-
-    wcn.ann_oil_production = "Oil [bbl/yr]"
-
-    im_mt.set_weight(
-        {
-            "ann_production_volume": 50,
-            "five_year_production_volume": 50,
-        }
-    )
-    assert im_mt.check_validity() is None
-    wcn.five_year_gas_production = "Five-Year Gas [Mcf]"
-
-    with pytest.raises(
-        AttributeError,
-        match=(
-            "Weight of the metric five_year_production_volume is nonzero, so attribute "
-            "five_year_oil_production is an essential input in the WellDataColumnNames object."
-        ),
-    ):
-        wcn.check_columns_available(im_mt)

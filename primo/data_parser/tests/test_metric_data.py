@@ -15,6 +15,7 @@
 import logging
 
 # Installed libs
+from pyomo.common.config import ConfigValue, NonNegativeFloat, Bool
 import pytest
 
 # User-defined libs
@@ -49,6 +50,13 @@ def test_metric_class(caplog):
 
     assert z.data_col_name is None
     assert z.score_col_name is None
+
+    assert z.is_binary_type is False
+    assert z.has_inverse_priority is False
+    assert z.fill_missing_value is None
+    assert z._fill_missing_value.name() == "met_1"
+    z.fill_missing_value = "foo"
+    assert z.fill_missing_value == "foo"
 
     z.data_col_name = "Metric One"
     assert z.score_col_name == "Metric One Score [0-50]"
@@ -85,6 +93,27 @@ def test_metric_class(caplog):
         "Received 50.7, a non-integer value for weight. "
         "Rounding it to 51, the nearest integer value."
     ) in caplog.text
+
+    # Test the _configure_fill_missing_value method
+    z._configure_fill_missing_value(domain=NonNegativeFloat, default=3)
+    assert z.fill_missing_value == 3.0
+    z.fill_missing_value = 5
+    assert z.fill_missing_value == 5.0
+    assert not z.is_binary_type
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "invalid value for configuration 'met_1':\n"
+            "\tFailed casting foo\n\tto NonNegativeFloat\n"
+            "\tError: could not convert string to float: 'foo'"
+        ),
+    ):
+        z.fill_missing_value = "foo"
+
+    z._configure_fill_missing_value(domain=Bool, default="Yes")
+    assert z.is_binary_type
+    assert z.fill_missing_value is True
 
 
 def test_submetric_class():
@@ -291,7 +320,8 @@ def test_impact_metrics_class():
     assert hasattr(im_wt, "ch4_emissions")
     assert hasattr(im_wt, "dac_impact")
     assert hasattr(im_wt, "sensitive_receptors")
-    assert hasattr(im_wt, "production_volume")
+    assert hasattr(im_wt, "ann_production_volume")
+    assert hasattr(im_wt, "five_year_production_volume")
     assert hasattr(im_wt, "well_age")
     assert hasattr(im_wt, "well_count")
     assert hasattr(im_wt, "other_emissions")
@@ -308,6 +338,10 @@ def test_impact_metrics_class():
         "violation": im_wt.violation,
         "incident": im_wt.incident,
     }
+    assert im_wt.compliance.is_binary_type
+    assert im_wt.compliance.has_inverse_priority
+    assert im_wt.compliance._fill_missing_value._domain is Bool
+    assert im_wt.compliance.fill_missing_value
 
     assert hasattr(im_wt, "fed_dac")
     assert hasattr(im_wt, "state_dac")
@@ -338,11 +372,17 @@ def test_impact_metrics_class():
         "state_wetlands_far": im_wt.state_wetlands_far,
     }
 
-    assert hasattr(im_wt, "ann_production_volume")
-    assert hasattr(im_wt, "five_year_production_volume")
-    assert im_wt.production_volume.submetrics == {
-        "ann_production_volume": im_wt.ann_production_volume,
-        "five_year_production_volume": im_wt.five_year_production_volume,
+    assert hasattr(im_wt, "ann_gas_production")
+    assert hasattr(im_wt, "ann_oil_production")
+    assert hasattr(im_wt, "five_year_gas_production")
+    assert hasattr(im_wt, "five_year_oil_production")
+    assert im_wt.ann_production_volume.submetrics == {
+        "ann_gas_production": im_wt.ann_gas_production,
+        "ann_oil_production": im_wt.ann_oil_production,
+    }
+    assert im_wt.five_year_production_volume.submetrics == {
+        "five_year_gas_production": im_wt.five_year_gas_production,
+        "five_year_oil_production": im_wt.five_year_oil_production,
     }
 
     assert hasattr(im_wt, "h2s_leak")
