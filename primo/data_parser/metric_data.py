@@ -21,10 +21,7 @@ import pandas as pd
 from pyomo.common.config import ConfigValue, Bool
 
 # User-defined libs
-from primo.data_parser.default_data import (
-    SUPP_EFF_METRICS,
-    SUPP_IMPACT_METRICS,
-)
+from primo.data_parser.default_data import SUPP_EFF_METRICS, SUPP_IMPACT_METRICS
 from primo.utils.config_utils import UserPriorities
 from primo.utils.raise_exception import raise_exception
 
