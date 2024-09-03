@@ -408,7 +408,7 @@ class WellData:
         col_name : str
             Name of the column
 
-        value : float
+        value : float, int, str
             Empty cells in the column will be filled with `value`
 
         flag_col_name : str
@@ -651,8 +651,10 @@ class WellData:
 
     def _filter_production_volume(self):
         """
-        Removes wells whose lifelong production volume is less
-        than a specified value.
+        Removes wells whose lifelong production volume is greater
+        than a threshold value. The threshold value for gas and oil can be specified
+        via threshold_gas_production and threshold_oil_production arguments
+        while instantiating the WellData object
         """
         wcn = self._col_names
         if wcn.life_gas_production is None and wcn.life_oil_production is None:
@@ -674,7 +676,7 @@ class WellData:
             # Remove wells if their production volume is greater than the threshold
             production_volume = self.config.threshold_gas_production
             remove_rows = self.data[
-                self.data[wcn.life_gas_production] > production_volume
+                self.data[wcn.life_gas_production] >= production_volume
             ].index
             self._removed_rows["production_volume"] += list(remove_rows)
             self.data = self.data.drop(remove_rows)
@@ -688,7 +690,7 @@ class WellData:
             # Remove wells if their production volume is greater than the threshold
             production_volume = self.config.threshold_oil_production
             remove_rows = self.data[
-                self.data[wcn.life_oil_production] > production_volume
+                self.data[wcn.life_oil_production] >= production_volume
             ].index
             self._removed_rows["production_volume"] += list(remove_rows)
             self.data = self.data.drop(remove_rows)
@@ -835,6 +837,10 @@ class WellData:
         self._well_types["shallow"] = None
 
     def _process_input_data(self):
+        """
+        Performs data checks i.e., if they are within valid interval, fills/removes
+        missing information, and classifies wells as oil/gas/deep/shallow.
+        """
         wcn = self._col_names
 
         LOGGER.info("Checking availability and uniqueness of well ids.")
@@ -918,7 +924,7 @@ class WellData:
         """
         Computes scores for all metrics/submetrics (supported and custom metrics) and
         the total priority score. This method must be called after processing the
-        entire data.
+        data for custom metrics (if any).
 
         Parameters
         ----------
@@ -967,6 +973,10 @@ class WellData:
             # For all other metrics/submetrics with a nonzero weight.
             # Step 1: Ensure that the data for this metric is provided.
             if metric.data_col_name is None:
+                # This will not happen for supported metrics, because this check
+                # is performed before in col_names.check_columns_available()
+                # method. However, this may happen for non-supported/user-defined
+                # custom metrics.
                 msg = (
                     f"data_col_name attribute for metric {metric.name}/{metric.full_name} "
                     f"is not provided."

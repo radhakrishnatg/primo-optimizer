@@ -28,7 +28,7 @@ MAP_PATH_EXPECTED_HARDCODED_DATA_COUNT = {
     "primo/data_parser/metric_data.py": 15,
     "primo/data_parser/well_data.py": 37,
     "primo/data_parser/tests/test_metric_data.py": 50,
-    "primo/data_parser/tests/test_well_data.py": 173,
+    "primo/data_parser/tests/test_well_data.py": 195,
     "primo/data_parser/tests/test_well_data_column_names.py": 13,
     "primo/data_parser/tests/test_well_data_common_methods.py": 73,
     "docs/conf.py": 4,

@@ -547,3 +547,88 @@ def test_compute_priority_scores(caplog, get_column_names):
 
     # All cells in the leak column must be zero
     assert (wd.data[im_metrics.leak.score_col_name] == 0).all()
+
+    # Compliance has inverse priority. Check if the score is calculated correctly
+    compliant_row = 289  # Row that has a compliant well
+    non_compliant_row = 290  # Row that has a non-compliant well
+    assert np.isclose(
+        wd.data.loc[compliant_row, im_metrics.compliance.score_col_name],
+        0,
+    )
+    assert np.isclose(
+        wd.data.loc[non_compliant_row, im_metrics.compliance.score_col_name],
+        9.0,
+    )
+
+    # Violation is proportional to priority.
+    # Check if the score is calculated correctly
+    violation_row = 274  # Row that has a well that is in violation
+    non_violation_row = 275  # Row that has a well that is not in violation
+    assert np.isclose(
+        wd.data.loc[violation_row, im_metrics.violation.score_col_name],
+        6.0,
+    )
+    assert np.isclose(
+        wd.data.loc[non_violation_row, im_metrics.violation.score_col_name],
+        0,
+    )
+
+    # Num. Hospitals are proportional to priority
+    hospital_row = 296
+    assert np.isclose(
+        wd.data.loc[hospital_row, im_metrics.hospitals.score_col_name],
+        ((4 - 0) / (6 - 0)) * im_metrics.hospitals.effective_weight,
+    )
+
+    # Num. Schools are proportional to priority
+    school_row = 297
+    assert np.isclose(
+        wd.data.loc[school_row, im_metrics.schools.score_col_name],
+        ((3 - 0) / (6 - 0)) * im_metrics.schools.effective_weight,
+    )
+
+    # Annual gas and oil production volumes have inverse priority
+    oil_production_row = 300
+    gas_production_row = 301
+    assert np.isclose(
+        wd.data.loc[gas_production_row, im_metrics.ann_gas_production.score_col_name],
+        ((981.6 - 63.01) / 981.6) * im_metrics.ann_gas_production.effective_weight,
+    )
+    assert np.isclose(
+        wd.data.loc[oil_production_row, im_metrics.ann_oil_production.score_col_name],
+        ((998.22 - 511.4) / 998.22) * im_metrics.ann_oil_production.effective_weight,
+    )
+
+    # Test errors thrown by the method
+    wd_df = pd.read_csv(filename, usecols=col_names.values())
+
+    # Set a non-numeric value
+    wd_df[col_names.hospitals] = wd_df[col_names.hospitals].astype("object")
+    wd_df.loc[250, col_names.hospitals] = "NULL"
+    wd = WellData(filename=wd_df, column_names=col_names)
+    with pytest.raises(
+        ValueError,
+        match=(
+            f"Unable to compute scores for metric {im_metrics.hospitals.name}/"
+            f"{im_metrics.hospitals.full_name},  because the column "
+            f"{im_metrics.hospitals.data_col_name} "
+            f"contains non-numeric values in rows \\[250\\]."
+        ),
+    ):
+        wd.compute_priority_scores(im_metrics)
+
+    # Error raised when the data for an unsupported metric is missing
+    im_metrics.register_new_metric("my_metric", 5, "My Custom Metric")
+    im_metrics.dac_impact.weight = 0
+    im_metrics.fed_dac.weight = 0
+
+    wd_df = pd.read_csv(filename, usecols=col_names.values())
+    wd = WellData(filename=wd_df, column_names=col_names)
+    with pytest.raises(
+        ValueError,
+        match=(
+            "data_col_name attribute for metric my_metric/My Custom Metric "
+            "is not provided."
+        ),
+    ):
+        wd.compute_priority_scores(im_metrics)
