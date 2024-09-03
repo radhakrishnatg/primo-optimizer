@@ -5,13 +5,15 @@ sensitive data formats and features being handled.
 For more information, see the README.md file in this directory.
 """
 
+# Standard libs
 import ast
 import numbers
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
+# Installed libs
 import pytest
-from stagedfright import StagedFile, AllowFile, PyContent
+from stagedfright import AllowFile, PyContent, StagedFile
 
 
 def test_allowfile_matches_if_present(staged: StagedFile, allowfile: AllowFile):
@@ -24,8 +26,9 @@ MAP_PATH_EXPECTED_HARDCODED_DATA_COUNT = {
     "primo/data_parser/data_model.py": 8,
     "primo/data_parser/default_data.py": 41,
     "primo/data_parser/metric_data.py": 15,
-    "primo/data_parser/well_data.py": 7,
+    "primo/data_parser/well_data.py": 32,
     "primo/data_parser/tests/test_metric_data.py": 50,
+    "primo/data_parser/tests/test_well_data.py": 107,
     "primo/data_parser/tests/test_well_data_column_names.py": 13,
     "primo/data_parser/tests/test_well_data_common_methods.py": 73,
     "docs/conf.py": 4,

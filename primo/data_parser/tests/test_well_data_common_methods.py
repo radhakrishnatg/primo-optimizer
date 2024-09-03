@@ -64,49 +64,27 @@ def get_well_data_from_csv_fixture():
         "random_well_data_common.csv",
     )
 
-    wd = WellData(filename=filename, column_names=col_names)
+    wd = WellData(
+        filename=filename,
+        column_names=col_names,
+        preliminary_data_check=False,
+    )
 
     return wd
 
 
-@pytest.fixture(name="get_well_data_from_xlsx", scope="function")
-def get_well_data_from_xlsx_fixture():
-    """Returns well data from an excel file"""
-
-    col_names = WellDataColumnNames(
-        well_id="API Well Number",
-        latitude="x",
-        longitude="y",
-        age="Age [Years]",
-        depth="Depth [ft]",
-        operator_name="Operator Name",
-        leak="Leak [Yes/No]",
-        compliance="Compliance [Yes/No]",
-        ann_gas_production="Gas [Mcf/Year]",
-        ann_oil_production="Oil [bbl/Year]",
-    )
-
-    filename = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "random_well_data_common.xlsx",
-    )
-
-    wd = WellData(filename=filename, column_names=col_names)
-
-    return wd
-
-
-# Test excel reader works, and ensure that the data is the same as in
-# the csv file. After this stage, only the csv data file will be tested.
-def test_excel_reader(get_well_data_from_csv, get_well_data_from_xlsx):
-    """
-    Tests if the excel reader works, and ensures that the data is the same
-    as in the csv file. This way, after this stage, only the data in the
-    csv file can be tested. If a method works for the csv file, then it
-    also works for the excel file.
-    """
+def test_excel_reader(tmp_path, get_well_data_from_csv):
+    # Build an excel file in a temp folder
+    filename = tmp_path / "my_data.xlsx"
     wd_csv = get_well_data_from_csv
-    wd_xlsx = get_well_data_from_xlsx
+    wd_csv.data.to_excel(filename)
+
+    # Read the excel file from the temp folder
+    wd_xlsx = WellData(
+        filename=str(filename),
+        column_names=wd_csv._col_names,
+        preliminary_data_check=False,
+    )
 
     pd.testing.assert_frame_equal(wd_csv.data, wd_xlsx.data)
     assert wd_csv.data.shape[0] == 50
@@ -313,11 +291,11 @@ def test_fill_incomplete_data(caplog, get_well_data_from_csv):
         value="Foo",
         flag_col_name="operator_flag",
     )
-    assert (f"Found empty cells in column {col_names.operator_name}") not in caplog.text
+    assert f"Found empty cells in column {col_names.operator_name}" not in caplog.text
     assert (
         f"Filling any empty cells in column {col_names.operator_name} "
         f"with value Foo."
-    ) in caplog.text
+    ) not in caplog.text
 
     assert "operator_flag" not in wd
     assert wd.get_flag_columns == ["gas_prod_flag", "oil_prod_flag"]
@@ -336,7 +314,7 @@ def test_replace_data(caplog, get_well_data_from_csv):
     assert non_numeric_rows == list(range(2, 52))
 
     # Fill incomplete cells
-    wd.fill_incomplete_data(col_names.leak, wd.config.fill_leak, "leak_flag")
+    wd.fill_incomplete_data(col_names.leak, False, "leak_flag")
     assert f"Found empty cells in column {col_names.leak}" in caplog.text
     assert (
         f"Filling any empty cells in column {col_names.leak} with value {False}."
@@ -364,7 +342,7 @@ def test_convert_data_to_binary(caplog, get_well_data_from_csv):
     col_names = wd._col_names
 
     # Fill incomplete cells
-    wd.fill_incomplete_data(col_names.leak, wd.config.fill_leak, "leak_flag")
+    wd.fill_incomplete_data(col_names.leak, False, "leak_flag")
     assert f"Found empty cells in column {col_names.leak}" in caplog.text
     assert (
         f"Filling any empty cells in column {col_names.leak} with value {False}."
