@@ -83,7 +83,7 @@ SUPP_IMPACT_METRICS = {
     "well_count": _SupportedContent(
         name="well_count",
         full_name="Owner Well Count",
-        required_data="owner_name",
+        required_data="operator_name",
     ),
     "other_emissions": _SupportedContent(
         name="other_emissions",

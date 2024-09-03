@@ -12,12 +12,12 @@
 #################################################################################
 
 # Standard libs
-import datetime
 import logging
 import math
 from typing import Union
 
 # Installed libs
+import numpy as np
 import pandas as pd
 from pyomo.common.config import (
     Bool,
@@ -230,6 +230,9 @@ class WellData:
             # Use case: Partition the wells as gas and oil wells and return them as
             # two new WellData objects
             self.data = filename
+            # Check if the columns are present in the data
+            for col in column_names.values():
+                assert col in self.data.columns
 
         elif filename.split(".")[-1] in ["xlsx", "xls"]:
             self.data = pd.read_excel(
@@ -240,6 +243,9 @@ class WellData:
                 dtype={column_names.well_id: str},
             )
 
+            # Updating the `index` to keep it consistent with the row numbers in file
+            self.data.index += 2
+
         elif filename.split(".")[-1] == "csv":
             self.data = pd.read_csv(
                 filename,
@@ -248,15 +254,14 @@ class WellData:
                 dtype={column_names.well_id: str},
             )
 
+            # Updating the `index` to keep it consistent with the row numbers in file
+            self.data.index += 2
+
         else:
             raise_exception(
                 "Unsupported input file format. Only .xlsx, .xls, and .csv are supported.",
                 TypeError,
             )
-
-        # Updating the `index` to keep it consistent with the row numbers in
-        # xlsx, xls, or csv files
-        self.data.index += 2
 
         # Read input options
         self.config = CONFIG(kwargs)
@@ -905,18 +910,9 @@ class WellData:
     def _append_fed_dac_data(self):
         """Appends federal DAC data"""
         census_year = self.config.census_year
-        if datetime.date.today().year - census_year > 10:
-            LOGGER.warning(
-                f"Package is using {census_year} census data by default. "
-                f"Consider upgrading to a newer version. Census year can be updated "
-                f"by passing the census_year argument while instantiating a WellData object."
-            )
-
-        """
-        TODO:
-        Append Tract ID/GEOID, population density, Total population, land area, 
-        federal DAC score to the DataFrame
-        """
+        # TODO:
+        # Append Tract ID/GEOID, population density, Total population, land area,
+        # federal DAC score to the DataFrame
 
     def compute_priority_scores(self, impact_metrics: ImpactMetrics):
         """
@@ -1002,6 +998,17 @@ class WellData:
             max_value = self.data[metric.data_col_name].max()
             min_value = self.data[metric.data_col_name].min()
 
+            # Check if division by a zero is likely
+            if np.isclose(max_value, min_value, rtol=0.001):
+                # All cells in this column have equal value.
+                # To avoid division by zero, set min_value = 0
+                min_value = 0
+
+            if np.isclose(max_value, 0, rtol=0.001):
+                # All values in this column are likely zeros.
+                # To avoid division by zero, set max_value = 1
+                max_value = 1.0
+
             if metric.has_inverse_priority:
                 self.data[metric.score_col_name] = (
                     (max_value - self.data[metric.data_col_name])
@@ -1015,9 +1022,9 @@ class WellData:
                 ) * metric.effective_weight
 
         LOGGER.info("Computing the total priority score.")
-        self.data["Priority Score [0-100]"] = 0
-        for col in self.get_priority_score_columns:
-            self.data["Priority Score [0-100]"] += self.data[col]
+        self.data["Priority Score [0-100]"] = self.data[
+            self.get_priority_score_columns
+        ].sum(axis=1)
 
         self.check_data_in_range("Priority Score [0-100]", 0.0, 100.0)
         LOGGER.info("Completed the calculation of priority scores.")
@@ -1035,8 +1042,10 @@ class WellData:
         if well_type["oil"] is not None and well_type["gas"] is not None:
             well_data = {}
             for v in ["oil", "gas"]:
+                row_list = list(well_type[v])
+                row_list.sort()
                 well_data[v] = WellData(
-                    filename=self.data.loc[list(well_type[v])],
+                    filename=self.data.loc[row_list],
                     column_names=self._col_names,
                     **config_options,
                 )
@@ -1061,8 +1070,10 @@ class WellData:
         if well_type["shallow"] is not None and well_type["deep"] is not None:
             well_data = {}
             for v in ["deep", "shallow"]:
+                row_list = list(well_type[v])
+                row_list.sort()
                 well_data[v] = WellData(
-                    filename=self.data.loc[list(well_type[v])],
+                    filename=self.data.loc[row_list],
                     column_names=self._col_names,
                     **config_options,
                 )
@@ -1076,6 +1087,10 @@ class WellData:
 
     @property
     def full_partitioned_data(self):
+        """
+        Partitions the wells as Oil-Deep, Oil-Shallow, Gas-Deep, Gas-Shallow
+        wells, if all the required information is available
+        """
         well_type = self._well_types
         config_options = dict(self.config)
         # Preliminary data check is not needed, since the data is already processed
@@ -1090,8 +1105,10 @@ class WellData:
             }
             well_data = {}
             for key, val in index.items():
+                row_list = list(val)
+                row_list.sort()
                 well_data[key] = WellData(
-                    filename=self.data.loc[list(val)],
+                    filename=self.data.loc[row_list],
                     column_names=self._col_names,
                     **config_options,
                 )
@@ -1113,3 +1130,10 @@ class WellData:
 
         elif filename.split(".")[-1] == "csv":
             self.data.to_csv(filename)
+
+        else:
+            file_format = "." + filename.split(".")[-1]
+            raise_exception(
+                f"Format {file_format} is not supported.",
+                ValueError,
+            )
