@@ -13,7 +13,7 @@
 
 # Standard libs
 import logging
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
 from typing import Union
 
 # User-defined libs
@@ -77,6 +77,12 @@ class WellDataColumnNames:
 
     # Columns for well_integrity metric
     well_integrity: Union[str, None] = None
+
+    # Additional user-specific columns
+    additional_columns: InitVar[dict] = {}
+
+    def __post_init__(self, additional_columns):
+        self.register_new_columns(additional_columns)
 
     def __contains__(self, key):
         # Checks if an attribute is present

@@ -31,15 +31,21 @@ def test_well_data_column_names():
         longitude="Longitude",
         age="Age [Years]",
         depth="Depth [ft]",
+        additional_columns={
+            "c1": "Custom Column 1",
+            "c2": "Custom Column 2",
+        },
     )
 
-    cols = ["well_id", "latitude", "longitude", "age", "depth"]
+    cols = ["well_id", "latitude", "longitude", "age", "depth", "c1", "c2"]
 
     assert wcn.well_id == "Well API"
     assert wcn.latitude == "Latitude"
     assert wcn.longitude == "Longitude"
     assert wcn.age == "Age [Years]"
     assert wcn.depth == "Depth [ft]"
+    assert wcn.c1 == "Custom Column 1"
+    assert wcn.c2 == "Custom Column 2"
 
     # Testing contains, keys, and values methods
     for key in cols:
@@ -52,6 +58,8 @@ def test_well_data_column_names():
         "Longitude",
         "Age [Years]",
         "Depth [ft]",
+        "Custom Column 1",
+        "Custom Column 2",
     ]
 
     # Testing items method
