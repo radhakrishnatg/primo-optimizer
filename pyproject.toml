@@ -31,6 +31,7 @@ description = "PRIMO - The P&A Project Optimizer"
 dependencies = [
     "appengine-python-standard",
     "censusgeocode",
+    "fast_autocomplete[levenshtein]",
     "folium",
     "geopandas",
     "gurobipy",
@@ -77,16 +78,21 @@ dev = [
     "addheader",
     "black",
     "isort",
+    "linkify-it-py",
     "myst-parser",
     "nbsphinx",
     "pre-commit",
+    "pylint",
     "sphinx",
+    "sphinxcontrib-spelling",
     "sphinx-rtd-theme",
 ]
 
 test = [
     "pytest", 
-    "pytest-cov"
+    "pytest-cov",
+    "pytest-ipywidgets[notebook]",
+    "pytest-playwright"
 ]
 
 [project.scripts]

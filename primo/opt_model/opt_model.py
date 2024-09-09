@@ -12,6 +12,7 @@
 #################################################################################
 # Standard libs
 import copy
+import inspect
 import itertools
 import logging
 from typing import Dict, Union
@@ -20,7 +21,6 @@ from typing import Dict, Union
 import numpy as np
 import pyomo.environ as pyo
 from gurobipy import GRB
-from pyomo.opt import SolverFactory
 
 # User-defined libs
 from primo.data_parser.data_model import OptInputs
@@ -529,35 +529,45 @@ class OptModel(BaseModel):
             options = copy.deepcopy(solver_params)
 
         # Retain stdout logs by default
-        stream_solver = options.pop("stream_solver", True)
+        stream_output = options.get("stream_output", True)
 
         # Remove temporary files by default
         keepfiles = options.pop("keepfiles", False)
 
-        solver = options.pop("solver")
+        # callback options
+        callback = options.pop("LazyConstraints", 0)
 
+        # Get arguments for solver object
+        get_solver_args = {}
+        parameters = inspect.signature(get_solver).parameters
+        for parameter_name, parameter in parameters.items():
+            default_val = parameter.default
+            get_solver_args[parameter_name] = options.pop(parameter_name, default_val)
+
+        get_solver_args["solver_options"] = options
+
+        solver_obj = get_solver(**get_solver_args)
+
+        solver = get_solver_args.get("solver")
         if solver == "gurobi_persistent":
-            solver_io = options.pop("solver_io", None)
-            opt = SolverFactory(solver, solver_io=solver_io)
 
+            solver_obj.set_instance(self.model)
             callback = False
-            for key, val in options.items():
-                if key == "LazyConstraints" and val == 1:
-                    callback = True
-                opt.options[key] = val
 
             if callback:
                 self.model.cons = pyo.ConstraintList()
-                opt.set_instance(self.model)
-                opt.set_callback(distance_callback)
-            results = opt.solve(self.model, keepfiles=keepfiles, tee=stream_solver)
+                solver_obj.options["LazyConstraints"] = 1
+                solver_obj.set_callback(distance_callback)
 
+        if solver == "highs":
+            # Highs does not like the keepfiles and tee keywords
+            results = solver_obj.solve(self.model)
         else:
+            results = solver_obj.solve(
+                self.model, keepfiles=keepfiles, tee=stream_output
+            )
 
-            solver = get_solver(**solver_params)
-            results = solver.solve(self.model)
-
-        if check_optimal_termination(results, solver_params.get("solver")):
+        if check_optimal_termination(results, solver):
             return True
 
         # If solution is not proven optimal, let's check for feasibility

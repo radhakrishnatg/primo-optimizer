@@ -13,14 +13,20 @@
 
 # Standard libs
 import json
+import logging
 import os
-from typing import Any, Tuple
+import typing
+from typing import Any, List, Tuple
 
 # Installed libs
 import ipywidgets as widgets
+from fast_autocomplete import AutoComplete
+from IPython.display import display
 
 # User-defined libs
 from primo.utils.raise_exception import raise_exception
+
+LOGGER = logging.getLogger(__name__)
 
 
 def read_config(path: str) -> Tuple[bool, dict]:
@@ -518,3 +524,129 @@ class UserPriorities:
         Returns the description and the value of the checkbox
         """
         return self.priorities_, self.sub_priorities_
+
+
+class SelectWidget:
+    """
+    Class for displaying an autofill widget in Jupyter Notebook to select multiple choices from a
+    list of choices provided. The widget comes configured with an "Undo" button that clears all
+    selections
+
+    Parameters
+    ----------
+    choices: typing.Iterable[str]
+        Full collection of choices
+
+    button_description: str
+        The description to be displayed on the widget
+
+    type_description: str
+        The type of object to be selected, displayed on the widget
+
+    Attributes
+    ----------
+
+    button : widgets.Button
+        A button to confirm and add the selected option to the list of choices
+
+    selected_list : List[str]
+        A list containing all options selected by a user
+
+    widget : widgets.Combobox
+        A text widget with autofill feature for selecting options from a list
+    """
+
+    def __init__(
+        self,
+        choices: typing.Iterable[str],
+        button_description: str,
+        type_description: str,
+    ):
+        # AutoComplete box requires a dictionary
+        words_dict = {word: {} for word in choices}
+
+        self._autocomplete = AutoComplete(words=words_dict)
+        # Initialize text
+        self._text = ""
+        self.widget = widgets.Combobox(
+            value="",
+            placeholder=f"Select {type_description}",
+            description=type_description,
+            disabled=False,
+        )
+
+        self.widget.observe(self._on_change, names="value")
+
+        layout = widgets.Layout(width="auto", height="auto")
+
+        # Add button
+        self.button_add = widgets.Button(description=button_description, layout=layout)
+        self.button_add.on_click(self._add)
+
+        # Remove button
+        self.button_remove = widgets.Button(description="Undo", layout=layout)
+        self.button_remove.on_click(self._remove)
+        self.selected_list = []
+
+    def _on_change(self, data) -> None:
+        """
+        Dynamically update the list of choices available in the drop down widget
+        based on what is already selected
+        """
+
+        self._text = data["new"]
+
+        values = self._autocomplete.search(self._text, max_cost=3, size=3)
+
+        # convert nested list to flat list
+        values = list(sorted(set(str(item) for sublist in values for item in sublist)))
+
+        self.widget.options = values
+
+    def _add(self, _) -> None:
+        """
+        Adds a selected choice and prints confirmation message in Jupyter notebook
+        """
+
+        if self._text == "":
+            raise_exception("Nothing selected, cannot add to list", ValueError)
+        if self._text in self.selected_list:
+            msg = f"Choice: {self._text} already included in list of selections"
+            LOGGER.info(msg)
+            print(msg)
+        else:
+            self.selected_list.append(self._text)
+            msg = f"Choice {self._text} has been added to the list of selections"
+            LOGGER.info(msg)
+            print(msg)
+
+    def _remove(self, _) -> None:
+        """
+        Remove a selected choice and prints confirmation message in Jupyter Notebook
+        """
+
+        if self._text == "":
+            raise_exception("Nothing selected, cannot remove from list", ValueError)
+        if self._text not in self.selected_list:
+            raise_exception(
+                f"Choice {self._text} is not in the list",
+                ValueError,
+            )
+        else:
+            self.selected_list.remove(self._text)
+            msg = f"Choice {self._text} has been removed from the list."
+            LOGGER.info(msg)
+            print(msg)
+
+    def display(self):
+        """
+        Display the widget and button in the Jupyter Notebook
+        """
+        buttons = widgets.HBox([self.button_add, self.button_remove])
+        display(self.widget, buttons)
+
+    def return_selections(self) -> List[str]:
+        """
+        Return the list of selections made by a user
+        """
+        return self.selected_list
