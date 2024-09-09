@@ -12,6 +12,7 @@
 #################################################################################
 
 # Standard libs
+import copy
 import logging
 import math
 from typing import Union
@@ -332,6 +333,73 @@ class WellData:
         """Returns all the columns containing metric scores"""
         return [col for col in self.data.columns if " Score " in col]
 
+    @property
+    def get_gas_oil_wells(self):
+        """
+        Partitions the set of wells as gas wells and oil wells
+        """
+        well_type = self._well_types  # Well Types
+        if well_type["gas"] is not None and well_type["oil"] is not None:
+            return {
+                "gas": self._construct_sub_data(well_type["gas"]),
+                "oil": self._construct_sub_data(well_type["oil"]),
+            }
+
+        LOGGER.warning(
+            "Insufficient information for well categorization. Either specify "
+            "well_type in the input data, or provide both ann_gas_production "
+            "and ann_oil_production"
+        )
+
+        return None
+
+    @property
+    def get_shallow_deep_wells(self):
+        """
+        Partitions the set of wells as shallow or deep
+        """
+        well_type = self._well_types  # Well Types
+        if well_type["shallow"] is not None and well_type["deep"] is not None:
+            return {
+                "deep": self._construct_sub_data(well_type["deep"]),
+                "shallow": self._construct_sub_data(well_type["shallow"]),
+            }
+
+        LOGGER.warning(
+            "Insufficient information for well categorization. Either specify "
+            "well_type_by_depth in the input data, or specify threshold_depth "
+            "while instantiating the WellData object."
+        )
+
+        return None
+
+    @property
+    def get_fully_partitioned_data(self):
+        """
+        Partitions the wells as Oil-Deep, Oil-Shallow, Gas-Deep, Gas-Shallow
+        wells, if all the required information is available
+        """
+        well_type = self._well_types
+        if None not in well_type.values():
+            return {
+                "deep_oil": self._construct_sub_data(
+                    well_type["deep"].intersection(well_type["oil"])
+                ),
+                "shallow_oil": self._construct_sub_data(
+                    well_type["shallow"].intersection(well_type["oil"])
+                ),
+                "deep_gas": self._construct_sub_data(
+                    well_type["deep"].intersection(well_type["gas"])
+                ),
+                "shallow_gas": self._construct_sub_data(
+                    well_type["shallow"].intersection(well_type["gas"])
+                ),
+            }
+
+        LOGGER.warning("Insufficient information for well categorization.")
+
+        return None
+
     def has_incomplete_data(self, col_name: str):
         """
         Checks if a column contains empty cells.
@@ -525,12 +593,11 @@ class WellData:
         flag = True
         non_numeric_rows = []
         for i in self:
-            # Record the row number if it is an empty cell
-            if pd.isnull(self.data.loc[i, col_name]):
-                non_numeric_rows.append(i)
-
-            # Record the row number if it does not contain a numeric value
-            elif not pd.api.types.is_number(self.data.loc[i, col_name]):
+            # Record the row number if it is an empty cell, or
+            # if it does not contain a numeric value
+            if pd.isnull(self.data.loc[i, col_name]) or not pd.api.types.is_number(
+                self.data.loc[i, col_name]
+            ):
                 non_numeric_rows.append(i)
 
         if len(non_numeric_rows) > 0:
@@ -574,78 +641,38 @@ class WellData:
         )
         raise_exception(msg, NotImplementedError)
 
-    def _check_age_availability(self):
+    def _check_age_depth_availability(self, column):
         """
-        Check if the age of the well is available or not. If not, then
+        Checks if the age/depth of the well is available or not. If not, then
         this method fills the missing information.
+
+        column : str
+            Must be either "age" or "depth"
         """
-        # Identify wells for which age is not specified
-        col_name = self._col_names.age
-        flag, empty_cells = self.has_incomplete_data(col_name)
-        if not flag:
-            # Age is provided for all wells
-            return
+        col_name = getattr(self._col_names, column)
+        missing_method = getattr(self.config, "missing_" + column)
+        fill_value = getattr(self.config, "fill_" + column)
+        flag_col_name = column + "_flag"
 
-        # Flag the wells for which, the age is estimated/filled.
-        self.flag_wells(empty_cells, "age_flag")
-        if self.config.missing_age == "fill":
-            LOGGER.warning(
-                f"Assigning the age of the well as {self.config.fill_age} "
-                f"years, if it is missing. To change this number, pass fill_age "
-                f"argument while instantiating the WellData object."
-            )
-            self.fill_incomplete_data(col_name, self.config.fill_age)
+        # Uncomment this when estimation is supported.
+        # estimiation_function = {
+        #     "age": None,  # Replace None with function name later
+        #     "depth": None,  # Replace None with function name later
+        # }
 
-        elif self.config.missing_age == "remove":
-            self.drop_incomplete_data(col_name, "age")
+        if missing_method == "fill":
+            self.fill_incomplete_data(col_name, fill_value, flag_col_name)
 
-        elif self.config.missing_age == "estimate":
-            LOGGER.warning(
-                "Estimating the age of a well if it is missing. The estimation "
-                "approach assumes that all the wells in the input file are "
-                "arranged in chronological order of their commission. DO NOT USE "
-                "this utility if that is not the case!."
-            )
-            # age_estimation(self)
+        elif missing_method == "remove":
+            self.drop_incomplete_data(col_name=col_name, dict_key=column)
+
+        elif missing_method == "estimate":
+            LOGGER.warning(f"Estimating the {column} of a well if it is missing.")
+            # Uncomment the line below when it is supported
+            # estimiation_function[column](self)
+            # NOTE: Make sure to flag wells for which info is estimated
             raise_exception(
-                "Age estimation feature is not supported currently.",
-                NotImplementedError,
-            )
-
-    def _check_depth_availability(self):
-        """
-        Check if the depth of the well is available or not. If not, then
-        this method fills the missing information.
-        """
-        # Identify wells for which depth is not specified
-        col_name = self._col_names.depth
-        flag, empty_cells = self.has_incomplete_data(col_name)
-        if not flag:
-            # Depth is provided for all wells
-            return
-
-        # Flag the wells for which the depth is estimated.
-        self.flag_wells(empty_cells, "depth_flag")
-
-        if self.config.missing_depth == "fill":
-            LOGGER.warning(
-                f"Assigning the depth of the well as {self.config.fill_depth} "
-                f"ft, if it is missing. To change this number, pass fill_depth "
-                f"argument while instantiating the WellData object."
-            )
-            self.fill_incomplete_data(col_name, self.config.fill_depth)
-
-        elif self.config.missing_depth == "remove":
-            self.drop_incomplete_data(col_name, "depth")
-
-        elif self.config.missing_depth == "estimate":
-            LOGGER.warning(
-                "Estimating the depth of a well, if it is missing, from its "
-                "nearest neighbors."
-            )
-            # depth_estimation(self)
-            raise_exception(
-                "Depth estimation feature is not supported currently.",
+                f"{column} estimation feature is not supported currently.",
                 NotImplementedError,
             )
 
@@ -704,6 +731,8 @@ class WellData:
         """
         Compare gas and oil production levels and add a 'Well Type' column.
         """
+        # NOTE: If possible, consolidate _categorize_oil_gas and
+        #   _categorize_shallow_deep methods into one.
         wcn = self._col_names
         wt_col_name = wcn.well_type
         if wt_col_name in self:
@@ -836,6 +865,30 @@ class WellData:
         self._well_types["deep"] = None
         self._well_types["shallow"] = None
 
+    def _construct_sub_data(self, rows):
+        """
+        Constructs a new WellData object with a subset of rows.
+
+        rows: iterable object
+            list/set/any iterable object containing the subset of row indices
+            to include in the new object
+        """
+        row_list = list(rows)  # Convert the object to a list
+        row_list.sort()
+
+        config_options = dict(self.config)
+        # Preliminary data check is not needed, since the data is already processed
+        config_options["preliminary_data_check"] = False
+
+        # This helps keep the new object independent from the original object
+        column_names = copy.deepcopy(self._col_names)
+
+        return WellData(
+            filename=self.data.loc[row_list],
+            column_names=column_names,
+            **config_options,
+        )
+
     def _process_input_data(self):
         """
         Performs data checks i.e., if they are within valid interval, fills/removes
@@ -886,11 +939,11 @@ class WellData:
 
         # Check if age data is available, and calculate it if it is missing
         LOGGER.info("Checking if age of all wells is available.")
-        self._check_age_availability()
+        self._check_age_depth_availability(column="age")
 
         # Check if depth data is available, and calculate it if it is missing
         LOGGER.info("Checking if depth of all wells is available.")
-        self._check_depth_availability()
+        self._check_age_depth_availability(column="depth")
 
         # Filter wells based on production volume
         if (
@@ -938,6 +991,9 @@ class WellData:
         # Check if all the required columns for supported metrics are specified
         # If yes, register the name of the column containing the data in the
         # data_col_name attribute
+        # TODO: Combine the check_columns_available method with this method.
+        # TODO: Check fill data consistency for ann_gas_production and
+        # ann_oil_production. See _categorize_gas_oil_wells method for details.
         self._col_names.check_columns_available(im_mt)
 
         for metric in im_mt:
@@ -1038,93 +1094,6 @@ class WellData:
 
         self.check_data_in_range("Priority Score [0-100]", 0.0, 100.0)
         LOGGER.info("Completed the calculation of priority scores.")
-
-    @property
-    def get_gas_oil_wells(self):
-        """
-        Partitions the set of wells as gas wells and oil wells
-        """
-        well_type = self._well_types  # Well Types
-        config_options = dict(self.config)
-        # Preliminary data check is not needed, since the data is already processed
-        config_options["preliminary_data_check"] = False
-
-        if well_type["oil"] is not None and well_type["gas"] is not None:
-            well_data = {}
-            for v in ["oil", "gas"]:
-                row_list = list(well_type[v])
-                row_list.sort()
-                well_data[v] = WellData(
-                    filename=self.data.loc[row_list],
-                    column_names=self._col_names,
-                    **config_options,
-                )
-            return well_data
-
-        LOGGER.warning(
-            "Insufficient information for well categorization. Either specify "
-            "well_type in the input data, or provide both ann_gas_production "
-            "ann_oil_production"
-        )
-
-    @property
-    def get_shallow_deep_wells(self):
-        """
-        Partitions the set of wells as shallow or deep
-        """
-        well_type = self._well_types  # Well Types
-        config_options = dict(self.config)
-        # Preliminary data check is not needed, since the data is already processed
-        config_options["preliminary_data_check"] = False
-
-        if well_type["shallow"] is not None and well_type["deep"] is not None:
-            well_data = {}
-            for v in ["deep", "shallow"]:
-                row_list = list(well_type[v])
-                row_list.sort()
-                well_data[v] = WellData(
-                    filename=self.data.loc[row_list],
-                    column_names=self._col_names,
-                    **config_options,
-                )
-            return well_data
-
-        LOGGER.warning(
-            "Insufficient information for well categorization. Either specify "
-            "well_type_by_depth in the input data, or specify threshold_depth "
-            "while instantiating the WellData object."
-        )
-
-    @property
-    def full_partitioned_data(self):
-        """
-        Partitions the wells as Oil-Deep, Oil-Shallow, Gas-Deep, Gas-Shallow
-        wells, if all the required information is available
-        """
-        well_type = self._well_types
-        config_options = dict(self.config)
-        # Preliminary data check is not needed, since the data is already processed
-        config_options["preliminary_data_check"] = False
-
-        if None not in well_type.values():
-            index = {
-                "oil_deep": well_type["oil"].intersection(well_type["deep"]),
-                "oil_shallow": well_type["oil"].intersection(well_type["shallow"]),
-                "gas_deep": well_type["gas"].intersection(well_type["deep"]),
-                "gas_shallow": well_type["gas"].intersection(well_type["shallow"]),
-            }
-            well_data = {}
-            for key, val in index.items():
-                row_list = list(val)
-                row_list.sort()
-                well_data[key] = WellData(
-                    filename=self.data.loc[row_list],
-                    column_names=self._col_names,
-                    **config_options,
-                )
-            return well_data
-
-        LOGGER.warning("Insufficient information for well categorization.")
 
     def save_to_file(self, filename: str):
         """

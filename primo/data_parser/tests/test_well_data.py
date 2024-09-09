@@ -134,10 +134,9 @@ def test_well_data(caplog, get_column_names):
     assert wd._removed_rows["unknown_owner"] == INCOMPLETE_ROWS["Unknown Operator"]
 
     # Age checks
+    assert "Found empty cells in column Age [Years]" in caplog.text
     assert (
-        "Assigning the age of the well as 99 "
-        "years, if it is missing. To change this number, pass fill_age "
-        "argument while instantiating the WellData object."
+        "Filling any empty cells in column Age [Years] with value 99."
     ) in caplog.text
 
     # Ensure that wells are not deleted because of missing age
@@ -150,10 +149,9 @@ def test_well_data(caplog, get_column_names):
             assert wd.data.loc[row, "age_flag"] == 0
 
     # Depth checks
+    assert "Found empty cells in column Depth [ft]" in caplog.text
     assert (
-        "Assigning the depth of the well as 999 "
-        "ft, if it is missing. To change this number, pass fill_depth "
-        "argument while instantiating the WellData object."
+        "Filling any empty cells in column Depth [ft] with value 999."
     ) in caplog.text
 
     # Ensure that wells are not deleted because of missing depth
@@ -262,7 +260,7 @@ def test_no_warnings(caplog, get_column_names):
     assert (
         "Insufficient information for well categorization. Either specify "
         "well_type in the input data, or provide both ann_gas_production "
-        "ann_oil_production"
+        "and ann_oil_production"
     ) in caplog.text
 
     assert wd.get_shallow_deep_wells is None
@@ -272,7 +270,7 @@ def test_no_warnings(caplog, get_column_names):
         "while instantiating the WellData object."
     ) in caplog.text
 
-    assert wd.full_partitioned_data is None
+    assert wd.get_fully_partitioned_data is None
     assert "Insufficient information for well categorization." in caplog.text
 
     # Raises an error if the Well API is not unique
@@ -295,14 +293,12 @@ def test_age_depth_remove(caplog, get_column_names):
         missing_depth="remove",
     )
 
-    assert f"Found empty cells in column {col_names.age}" in caplog.text
     assert (
         f"Removed a few wells because {col_names.age} "
         f"information is not available for them."
     ) in caplog.text
     assert wd._removed_rows["age"] == INCOMPLETE_ROWS["Age"]
 
-    assert f"Found empty cells in column {col_names.depth}" in caplog.text
     assert (
         f"Removed a few wells because {col_names.depth} "
         f"information is not available for them."
@@ -316,7 +312,7 @@ def test_age_depth_estimation(caplog, get_column_names):
 
     with pytest.raises(
         NotImplementedError,
-        match="Age estimation feature is not supported currently.",
+        match="age estimation feature is not supported currently.",
     ):
         wd = WellData(
             filename=filename,
@@ -324,16 +320,11 @@ def test_age_depth_estimation(caplog, get_column_names):
             missing_age="estimate",
         )
 
-    assert (
-        "Estimating the age of a well if it is missing. The estimation "
-        "approach assumes that all the wells in the input file are "
-        "arranged in chronological order of their commission. DO NOT USE "
-        "this utility if that is not the case!."
-    ) in caplog.text
+    assert "Estimating the age of a well if it is missing." in caplog.text
 
     with pytest.raises(
         NotImplementedError,
-        match="Depth estimation feature is not supported currently.",
+        match="depth estimation feature is not supported currently.",
     ):
         wd = WellData(
             filename=filename,
@@ -341,10 +332,7 @@ def test_age_depth_estimation(caplog, get_column_names):
             missing_depth="estimate",
         )
 
-    assert (
-        "Estimating the depth of a well, if it is missing, from its "
-        "nearest neighbors."
-    ) in caplog.text
+    assert "Estimating the depth of a well if it is missing." in caplog.text
 
 
 def test_well_partitioning(tmp_path, get_column_names):
@@ -398,36 +386,36 @@ def test_well_partitioning(tmp_path, get_column_names):
     assert shallow_deep_wells["deep"].data.shape[0] == 100
     assert len(shallow_deep_wells) == 2
 
-    full_partition_wells = wd.full_partitioned_data
+    full_partition_wells = wd.get_fully_partitioned_data
     assert len(full_partition_wells) == 4
-    assert isinstance(full_partition_wells["oil_deep"], WellData)
-    assert full_partition_wells["oil_deep"].data.shape[0] == 50
-    assert list(full_partition_wells["oil_deep"].data.index) == list(range(150, 200))
+    assert isinstance(full_partition_wells["deep_oil"], WellData)
+    assert full_partition_wells["deep_oil"].data.shape[0] == 50
+    assert list(full_partition_wells["deep_oil"].data.index) == list(range(150, 200))
 
-    assert isinstance(full_partition_wells["oil_shallow"], WellData)
-    assert full_partition_wells["oil_shallow"].data.shape[0] == 50
-    assert list(full_partition_wells["oil_shallow"].data.index) == list(range(100, 150))
+    assert isinstance(full_partition_wells["shallow_oil"], WellData)
+    assert full_partition_wells["shallow_oil"].data.shape[0] == 50
+    assert list(full_partition_wells["shallow_oil"].data.index) == list(range(100, 150))
 
-    assert isinstance(full_partition_wells["gas_deep"], WellData)
-    assert full_partition_wells["gas_deep"].data.shape[0] == 50
-    assert list(full_partition_wells["gas_deep"].data.index) == list(range(50, 100))
+    assert isinstance(full_partition_wells["deep_gas"], WellData)
+    assert full_partition_wells["deep_gas"].data.shape[0] == 50
+    assert list(full_partition_wells["deep_gas"].data.index) == list(range(50, 100))
 
-    assert isinstance(full_partition_wells["gas_shallow"], WellData)
-    assert full_partition_wells["gas_shallow"].data.shape[0] == 50
-    assert list(full_partition_wells["gas_shallow"].data.index) == list(range(50))
+    assert isinstance(full_partition_wells["shallow_gas"], WellData)
+    assert full_partition_wells["shallow_gas"].data.shape[0] == 50
+    assert list(full_partition_wells["shallow_gas"].data.index) == list(range(50))
 
     # Write the data files to the temp directory
-    oil_deep_file = str(tmp_path / "oil_deep.xlsx")
-    full_partition_wells["oil_deep"].save_to_file(oil_deep_file)
-    gas_shallow_file = str(tmp_path / "gas_shallow.csv")
-    full_partition_wells["gas_shallow"].save_to_file(gas_shallow_file)
+    deep_oil_file = str(tmp_path / "deep_oil.xlsx")
+    full_partition_wells["deep_oil"].save_to_file(deep_oil_file)
+    shallow_gas_file = str(tmp_path / "shallow_gas.csv")
+    full_partition_wells["shallow_gas"].save_to_file(shallow_gas_file)
 
-    assert os.path.exists(oil_deep_file)
-    assert os.path.exists(gas_shallow_file)
+    assert os.path.exists(deep_oil_file)
+    assert os.path.exists(shallow_gas_file)
 
-    gas_deep_file = str(tmp_path / "gas_deep.foo")
+    deep_gas_file = str(tmp_path / "deep_gas.foo")
     with pytest.raises(ValueError, match="Format .foo is not supported."):
-        full_partition_wells["gas_deep"].save_to_file(gas_deep_file)
+        full_partition_wells["deep_gas"].save_to_file(deep_gas_file)
 
     # Check unrecognized well-type erros
     wd_df.loc[0, col_names.well_type] = "Foo"
