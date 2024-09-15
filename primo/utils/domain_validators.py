@@ -13,11 +13,16 @@
 
 """
 This module contains functions that can be used for domain validation
-in Pyomo's `ConfigDict()` data structure.
+with the `ConfigDict()` data structure from Pyomo.
 """
+# Standard libs
+from typing import Dict
 
 # Installed libs
 from pyomo.common.config import NonNegativeFloat
+
+# User-defined libs
+from primo.utils.opt_utils import in_bounds
 
 
 # pylint: disable-next = invalid-name
@@ -40,14 +45,14 @@ def InRange(lb, ub):
     """
 
     def _in_range(val):
-        if lb <= val <= ub:
+        if in_bounds(val, lb, ub, 0.0):
             return val
         raise ValueError(f"Value {val} lies outside the admissible range [{lb}, {ub}]")
 
     return _in_range
 
 
-def validate_mobilization_cost(data: dict):
+def validate_mobilization_cost(data: Dict[int, float]):
     """
     Validates the mobilization cost data
 

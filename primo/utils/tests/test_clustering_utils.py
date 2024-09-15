@@ -139,7 +139,7 @@ def test_perform_clustering(caplog):
         depth="Depth [ft]",
     )
 
-    wd = WellData(filename=filename, column_names=col_names)
+    wd = WellData(data=filename, column_names=col_names)
     assert "Clusters" not in wd
     assert not hasattr(col_names, "cluster")
 

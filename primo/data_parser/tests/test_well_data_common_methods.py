@@ -22,7 +22,7 @@ import pytest
 
 # User-defined libs
 from primo.data_parser.well_data import WellData
-from primo.data_parser.well_data_column_names import WellDataColumnNames
+from primo.data_parser.well_data_columns import WellDataColumnNames
 
 LOGGER = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def get_well_data_from_csv_fixture():
     )
 
     wd = WellData(
-        filename=filename,
+        data=filename,
         column_names=col_names,
         preliminary_data_check=False,
     )
@@ -81,7 +81,7 @@ def test_excel_reader(tmp_path, get_well_data_from_csv):
 
     # Read the excel file from the temp folder
     wd_xlsx = WellData(
-        filename=str(filename),
+        data=str(filename),
         column_names=wd_csv._col_names,
         preliminary_data_check=False,
     )
@@ -105,7 +105,7 @@ def test_unsupported_file_error():
         TypeError,
         match="Unsupported input file format. Only .xlsx, .xls, and .csv are supported.",
     ):
-        wd = WellData(filename="file.foo", column_names=col_names)
+        wd = WellData(data="file.foo", column_names=col_names)
 
 
 # Test dunder methods
@@ -162,7 +162,7 @@ def test_drop_incomplete_data(caplog, get_well_data_from_csv):
         assert isinstance(wd.data.loc[i, col_names.well_id], str)
 
     assert (
-        f"Removed a few wells because {col_names.well_id} information "
+        f"Removed wells because {col_names.well_id} information "
         f"is not available for them."
     ) in caplog.text
 
@@ -180,7 +180,7 @@ def test_drop_incomplete_data(caplog, get_well_data_from_csv):
         assert i not in wd.data.index
 
     assert (
-        f"Removed a few wells because {col_names.latitude} information "
+        f"Removed wells because {col_names.latitude} information "
         f"is not available for them."
     ) in caplog.text
 
