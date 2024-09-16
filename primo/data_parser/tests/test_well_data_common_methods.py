@@ -40,8 +40,6 @@ INCOMPLETE_ROWS = {
 }
 
 
-# pylint: disable = missing-function-docstring, protected-access
-# pylint: disable = unused-variable
 @pytest.fixture(name="get_well_data_from_csv", scope="function")
 def get_well_data_from_csv_fixture():
     """Returns well data from a csv file"""
@@ -87,8 +85,8 @@ def test_excel_reader(tmp_path, get_well_data_from_csv):
     )
 
     pd.testing.assert_frame_equal(wd_csv.data, wd_xlsx.data)
-    assert wd_csv.data.shape[0] == 50
-    assert wd_xlsx.data.shape[0] == 50
+    assert len(wd_csv) == 50
+    assert len(wd_xlsx) == 50
 
 
 def test_unsupported_file_error():
@@ -107,13 +105,16 @@ def test_unsupported_file_error():
     ):
         wd = WellData(data="file.foo", column_names=col_names)
 
+    with pytest.raises(TypeError, match="Unknown variable type for input data"):
+        wd = WellData(data=5, column_names=col_names)
+
 
 # Test dunder methods
 def test_dunder_methods(get_well_data_from_csv):
     wd = get_well_data_from_csv
 
     # Testing the __contains__ dunder method
-    for col in wd._col_names.values():
+    for col in wd.col_names.values():
         assert col in wd
 
     # The data file has two additional columns. Ensure that
@@ -124,6 +125,10 @@ def test_dunder_methods(get_well_data_from_csv):
     # Testing the __iter__ dunder method
     # list(wd) generates the list of rows in wd.data
     assert list(wd) == list(range(2, 52))
+
+    # Testing the __getitem__ dunder method
+    assert wd[wd.col_names.age] is wd.data[wd.col_names.age]
+    assert wd[wd.col_names.depth] is wd.data[wd.col_names.depth]
 
 
 def test_has_incomplete_data(caplog, get_well_data_from_csv):

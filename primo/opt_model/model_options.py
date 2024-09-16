@@ -260,6 +260,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         """Builds the optimization model"""
         LOGGER.info("Beginning to construct the optimization model.")
         self._opt_model = PluggingCampaignModel(self)
+        LOGGER.info("Completed the construction of the optimization model.")
         return self._opt_model
 
     def solve_model(self, **kwargs):
@@ -293,13 +294,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
             solver.set_gurobi_param("PoolSolutions", pool_size)
 
         # Solve the optimization problem
-        result = solver.solve(self._opt_model)
-
-        # Check optimal termination. If the solver did not find the optimal
-        # solution, then return None.
-        if not check_optimal_termination(result, solver_name):
-            LOGGER.warning("Solver did not find the optimal solution.")
-            return
+        solver.solve(self._opt_model)
 
         # Return the solution pool, if it is requested
         if solver_name == "gurobi_persistent" and pool_search_mode == 2:

@@ -141,13 +141,21 @@ class WellData:
         if num_wells_processed < num_wells_input:
             LOGGER.warning(msg)
 
-    def __contains__(self, val):
+    def __contains__(self, val: str):
         """Checks if a column is available in the well data"""
         return val in self.data.columns
+
+    def __getitem__(self, col_name: str):
+        """Returns the col_name column in the DataFrame"""
+        return self.data[col_name]
 
     def __iter__(self):
         """Iterate over all rows of the well data"""
         return iter(self.data.index)
+
+    def __len__(self):
+        """Returns number of wells in the dataset"""
+        return len(self.data)
 
     @property
     def col_names(self) -> WellDataColumnNames:
