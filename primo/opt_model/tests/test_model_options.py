@@ -88,7 +88,7 @@ def get_column_names_fixture():
     )
 
     filename = os.path.dirname(os.path.realpath(__file__))[:-16]  # Primo folder
-    filename += "\\demo\\Example_1_data.csv"
+    filename += r"/demo/Example_1_data.csv"
 
     return im_metrics, col_names, filename
 
