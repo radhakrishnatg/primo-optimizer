@@ -40,46 +40,44 @@ from primo.utils.raise_exception import raise_exception
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable = protected-access, attribute-defined-outside-init
-# pylint: disable = logging-fstring-interpolation
-class OptModelInputs:
+def model_config() -> ConfigDict:
     """
-    Assembles all the necessary inputs for the optimization model.
+    Returns a Pyomo ConfigDict object that includes all user options
+    associated with optimization modeling
     """
-
-    # Container for storing and performaing domain validation
+    # Container for storing and performing domain validation
     # of the inputs of the optimization model.
     # ConfigValue automatically performs domain validation.
-    CONFIG = ConfigDict()
-    CONFIG.declare(
+    config = ConfigDict()
+    config.declare(
         "well_data",
         ConfigValue(
             domain=IsInstance(WellData),
-            doc="WellData object containing the entire dataset.",
+            doc="WellData object containing the entire dataset",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "total_budget",
         ConfigValue(
             domain=NonNegativeFloat,
             doc="Total budget for plugging [in USD]",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "mobilization_cost",
         ConfigValue(
             domain=validate_mobilization_cost,
-            doc="Cost of plugging wells [in USD].",
+            doc="Cost of plugging wells [in USD]",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "perc_wells_in_dac",
         ConfigValue(
             domain=InRange(0, 100),
             doc="Minimum percentage of wells in disadvantaged communities",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "threshold_distance",
         ConfigValue(
             default=10.0,
@@ -87,28 +85,28 @@ class OptModelInputs:
             doc="Maximum distance [in miles] allowed between wells",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "max_wells_per_owner",
         ConfigValue(
             domain=NonNegativeInt,
             doc="Maximum number of wells per owner",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "max_cost_project",
         ConfigValue(
             domain=NonNegativeFloat,
             doc="Maximum cost per project [in USD]",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "max_size_project",
         ConfigValue(
             domain=NonNegativeInt,
             doc="Maximum number of wells admissible per project",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "num_wells_model_type",
         ConfigValue(
             default="multicommodity",
@@ -116,7 +114,7 @@ class OptModelInputs:
             doc="Choice of formulation for modeling number of wells",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "model_nature",
         ConfigValue(
             default="linear",
@@ -124,7 +122,7 @@ class OptModelInputs:
             doc="Nature of the optimization model: MILP or MIQCQP",
         ),
     )
-    CONFIG.declare(
+    config.declare(
         "lazy_constraints",
         ConfigValue(
             default=False,
@@ -133,13 +131,23 @@ class OptModelInputs:
         ),
     )
 
-    # Using Pyomo's ConfigDict for domain validation.
+    return config
+
+
+class OptModelInputs:  # pylint: disable=too-many-instance-attributes
+    """
+    Assembles all the necessary inputs for the optimization model.
+    """
+
+    # Using ConfigDict from Pyomo for domain validation.
+    CONFIG = model_config()
+
     @document_kwargs_from_configdict(CONFIG)
     def __init__(self, **kwargs):
         # Update the values of all the inputs
         # ConfigDict handles KeyError, other input errors, and domain errors
         LOGGER.info("Processing optimization model inputs.")
-        self.config = self.CONFIG(kwargs)
+        self.config = self.config(kwargs)
 
         # Raise an error if the essential inputs are not provided
         wd = self.config.well_data
@@ -162,12 +170,11 @@ class OptModelInputs:
 
         # Construct campaign candidates
         # Step 1: Perform clustering, Should distance_threshold be a user argument?
-        # FIXME: Are distance_threshold and threshold_distance related?
         perform_clustering(wd, distance_threshold=10.0)
 
         # Step 2: Identify list of wells belonging to each cluster
         # Structure: {cluster_1: [index_1, index_2,..], cluster_2: [], ...}
-        col_names = wd._col_names
+        col_names = wd.col_names
         set_clusters = set(wd.data[col_names.cluster])
         self.campaign_candidates = {
             cluster: list(wd.data[wd.data[col_names.cluster] == cluster].index)
@@ -201,7 +208,8 @@ class OptModelInputs:
 
         # NOTE: Attributes _opt_model and _solver are defined in
         # build_optimization_model and solve_model methods, respectively.
-
+        self._opt_model = None
+        self._solver = None
         LOGGER.info("Finished optimization model inputs.")
 
     @property
@@ -221,7 +229,7 @@ class OptModelInputs:
 
     @property
     def get_max_cost_project(self):
-        """Returns scaled maximum cost of the project [in million USD"""
+        """Returns scaled maximum cost of the project [in million USD]"""
         if self.config.max_cost_project is None:
             return None
 
@@ -231,8 +239,8 @@ class OptModelInputs:
         """Returns pairwise distance for a given set of wells"""
         wd = self.config.well_data
         df = wd.data
-        latitude = wd._col_names.latitude
-        longitude = wd._col_names.longitude
+        latitude = wd.col_names.latitude
+        longitude = wd.col_names.longitude
         return {
             (j, k): haversine(
                 (df.loc[j, latitude], df.loc[j, longitude]),
@@ -255,7 +263,7 @@ class OptModelInputs:
         """
         wd = self.config.well_data
         df = wd.data
-        column = getattr(wd._col_names, column)
+        column = getattr(wd.col_names, column)
         return {
             (j, k): abs(df.loc[j, column] - df.loc[k, column])
             for j, k in combinations(index, 2)
@@ -278,20 +286,20 @@ class OptModelInputs:
         # If a solver is specified, use it.
         if "solver" in kwargs:
             solver = get_solver(**kwargs)
-
+            solver_name = kwargs["solver"]
         else:
             # Otherwise, auto-detect solver in order of priority
-            for sol in ("gurobi_persistent", "gurobi", "scip", "glpk", "highs"):
-                if SolverFactory(sol).available(exception_flag=False):
+            for solver_name in ("gurobi_persistent", "gurobi", "scip", "glpk", "highs"):
+                if SolverFactory(solver_name).available(exception_flag=False):
                     LOGGER.info(
                         f"Optimization solver is not specified. "
-                        f"Using {sol} as the optimization solver."
+                        f"Using {solver_name} as the optimization solver."
                     )
-                    solver = get_solver(solver=sol, **kwargs)
+                    solver = get_solver(solver=solver_name, **kwargs)
                     break
 
         self._solver = solver
-        if solver.name == "gurobi_persistent":
+        if solver_name == "gurobi_persistent":
             # For persistent solvers, model instance need to be set manually
             solver.set_instance(self._opt_model)
             solver.set_gurobi_param("PoolSearchMode", pool_search_mode)
@@ -304,9 +312,10 @@ class OptModelInputs:
 
     def get_solution_pool(self):
         """Extracts solutions from the solution pool"""
+        # pylint: disable=protected-access
         solver = self._solver
-        pm = self._opt_model  # This is the pyomo model
-        gm = solver._solver_model  # This is the gurobipy model
+        pm = self._opt_model  # This is the Pyomo model
+        gm = solver._solver_model  # This is the Gurobipy model
         # Get Pyomo var to Gurobipy var map.
         # Gurobi vars can be accessed as py_to_gp[<pyomo var>]
         pm_to_gm = solver._pyomo_var_to_solver_var_map
@@ -319,7 +328,6 @@ class OptModelInputs:
         # Number of solutions found
         num_solutions = gm.SolCount
         solution_pool = {}
-        wd = self.config.well_data  # Well data
 
         for i in range(num_solutions):
             gm.Params.SolutionNumber = i

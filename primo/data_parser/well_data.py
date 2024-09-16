@@ -150,6 +150,13 @@ class WellData:
         return iter(self.data.index)
 
     @property
+    def col_names(self) -> WellDataColumnNames:
+        """
+        Returns the WellDataColumnNames object associated with the current object
+        """
+        return self._col_names
+
+    @property
     def get_removed_wells(self):
         """Returns the list of wells removed from the data set"""
         row_list = []

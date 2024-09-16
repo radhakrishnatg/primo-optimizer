@@ -35,7 +35,7 @@ def data_config() -> ConfigDict:
     config.declare(
         "preliminary_data_check",
         ConfigValue(
-            default=True, domain=Bool, doc="If True, performs preliminary data checks."
+            default=True, domain=Bool, doc="If True, performs preliminary data checks"
         ),
     )
     config.declare(
@@ -114,7 +114,7 @@ def data_config() -> ConfigDict:
             domain=NonNegativeFloat,
             doc=(
                 "Value to fill with, if the annual oil production "
-                "[in bbl/Year] is not specified."
+                "[in bbl/Year] is not specified"
             ),
         ),
     )
@@ -146,7 +146,7 @@ def data_config() -> ConfigDict:
             domain=NonNegativeFloat,
             doc=(
                 "If specified, wells whose lifelong gas production volume [in Mcf] is "
-                "above the threshold production volume will be removed from the dataset."
+                "above the threshold production volume will be removed from the dataset"
             ),
         ),
     )
@@ -156,7 +156,7 @@ def data_config() -> ConfigDict:
             domain=NonNegativeFloat,
             doc=(
                 "If specified, wells whose lifelong oil production volume [in bbl] is "
-                "above the threshold production volume will be removed from the dataset."
+                "above the threshold production volume will be removed from the dataset"
             ),
         ),
     )

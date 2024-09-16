@@ -8,6 +8,7 @@ DAC
 GeoDataFrame
 Geopandas
 Gurobi
+Gurobipy
 HBox
 IntSlider
 Iterable
@@ -22,8 +23,10 @@ SubCheckBoxWidget
 Submetric
 Submetrics
 Uncomment
+USD
 arg
 argparse
+astype
 autofill
 bool
 boolean
@@ -50,6 +53,7 @@ ipywidgets
 iterable
 json
 libs
+multicommodity
 ndarray
 np
 num
