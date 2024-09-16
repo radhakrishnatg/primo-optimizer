@@ -241,6 +241,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         df = wd.data
         latitude = wd.col_names.latitude
         longitude = wd.col_names.longitude
+        # TODO: Figure out how to use vector computations
         return {
             (j, k): haversine(
                 (df.loc[j, latitude], df.loc[j, longitude]),
@@ -264,6 +265,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         wd = self.config.well_data
         df = wd.data
         column = getattr(wd.col_names, column)
+        # TODO: Figure out how to use vector computations
         return {
             (j, k): abs(df.loc[j, column] - df.loc[k, column])
             for j, k in combinations(index, 2)
