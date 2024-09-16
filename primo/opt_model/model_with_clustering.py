@@ -13,6 +13,7 @@
 
 # Standard libs
 import logging
+from typing import Dict, Optional
 
 # Installed libs
 from pyomo.core.base.block import BlockData, declare_custom_block
@@ -28,9 +29,6 @@ from pyomo.environ import (
     Var,
     maximize,
 )
-
-# User-defined libs
-from primo.opt_model.model_options import OptModelInputs
 
 LOGGER = logging.getLogger(__name__)
 
@@ -246,31 +244,38 @@ class ClusterBlockData(BlockData):
         self.plugging_cost.unfix()
         self.num_wells_chosen.unfix()
 
-    def fix(self, cluster: int = 1, wells=None):
+    def fix(
+        self,
+        cluster: Optional[int] = None,
+        wells: Optional[Dict[int, int]] = None,
+    ):
         """
         Fixes the binary variables associated with the cluster
-        and/or the wells with in the cluster.
+        and/or the wells with in the cluster. To fix all variables
+        within the cluster, use the fix_all_vars() method.
 
         Parameters
         ----------
-        cluster : 0 or 1, default = 1
+        cluster : 0 or 1, default = None
             `select_cluster` variable will be fixed to this value.
+            If None, select_cluster will be fixed to its incumbent value.
 
         wells : dict, default = None
             key => index of the well, value => value of `select_well`
             binary variable.
         """
-        # Fix the cluster binary variable
-        self.select_cluster.fix(cluster)
+        if cluster is None:
+            # Nothing is specified, so fixing it to its incumbent value
+            self.select_cluster.fix()
 
-        if wells is None:
-            # Well binary variables are not selected, so return
-            return
+        elif cluster in [0, 1]:
+            self.select_cluster.fix(cluster)
 
-        # Need to fix a few wells within the cluster
-        for w in self.set_wells:
-            if w in wells:
-                self.select_well.fix(wells[w])
+        if wells is not None:
+            # Need to fix a few wells within the cluster
+            for w in self.set_wells:
+                if w in wells:
+                    self.select_well.fix(wells[w])
 
     def unfix(self):
         """
@@ -297,7 +302,7 @@ class PluggingCampaignModel(ConcreteModel):
     Builds the optimization model
     """
 
-    def __init__(self, model_inputs: OptModelInputs, *args, **kwargs):
+    def __init__(self, model_inputs, *args, **kwargs):
         """
         Builds the optimization model for identifying the set of projects that
         maximize the overall impact and/or efficiency of plugging.
@@ -419,3 +424,52 @@ class PluggingCampaignModel(ConcreteModel):
         # wd = self.model_inputs.config.well_data
         # return OptimalCampaign(wd, optimal_campaign, plugging_cost)
         return (optimal_campaign, plugging_cost)
+
+    def get_solution_pool(self, solver):
+        """
+        Extracts solutions from the solution pool
+
+        Parameters
+        ----------
+        solver : Pyomo solver object
+        """
+        pm = self  # This is the pyomo model
+        # pylint: disable=protected-access
+        gm = solver._solver_model  # This is the gurobipy model
+        # Get Pyomo var to Gurobipy var map.
+        # Gurobi vars can be accessed as pm_to_gm[<pyomo var>]
+        pm_to_gm = solver._pyomo_var_to_solver_var_map
+
+        # Number of solutions found
+        num_solutions = gm.SolCount
+        solution_pool = {}
+        # Well data
+        # wd = self.model_inputs.config.well_data
+
+        for i in range(num_solutions):
+            gm.Params.SolutionNumber = i
+
+            optimal_campaign = {}
+            plugging_cost = {}
+
+            for c in pm.set_clusters:
+                blk = pm.cluster[c]
+                if pm_to_gm[blk.select_cluster].Xn < 0.05:
+                    # Cluster c is not chosen, so continue
+                    continue
+
+                # Wells in cluster c are chosen
+                optimal_campaign[c] = []
+                plugging_cost[c] = pm_to_gm[blk.plugging_cost].Xn
+                for w in blk.set_wells:
+                    if pm_to_gm[blk.select_well[w]].Xn > 0.95:
+                        # Well w is chosen, so store it in the dict
+                        optimal_campaign[c].append(w)
+
+            # TODO: Uncomment the following lines after result_parser is merged
+            # solution_pool[i + 1] = OptimalCampaign(
+            #     wd=wd, clusters_dict=optimal_campaign, plugging_cost=plugging_cost
+            # )
+            solution_pool[i + 1] = (optimal_campaign, plugging_cost)
+
+        return solution_pool

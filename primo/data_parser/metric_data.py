@@ -663,10 +663,9 @@ class ImpactMetrics(SetOfMetrics):
         super().__init__()
 
         if impact_metrics is None:
-            impact_metrics_arg = SUPP_IMPACT_METRICS
-        else:
-            impact_metrics_arg = impact_metrics
-        for val in impact_metrics_arg.values():
+            impact_metrics = SUPP_IMPACT_METRICS
+
+        for val in impact_metrics.values():
             if not val.is_submetric:
                 self.register_new_metric(
                     name=val.name,
@@ -695,10 +694,9 @@ class EfficiencyMetrics(SetOfMetrics):
     ) -> None:
         super().__init__()
         if efficiency_metrics is None:
-            efficiency_metrics_arg = SUPP_EFF_METRICS
-        else:
-            efficiency_metrics_arg = efficiency_metrics
-        for val in efficiency_metrics_arg.values():
+            efficiency_metrics = SUPP_EFF_METRICS
+
+        for val in efficiency_metrics.values():
             self.register_new_metric(
                 name=val.name,
                 full_name=val.full_name,

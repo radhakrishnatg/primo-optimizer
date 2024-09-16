@@ -16,7 +16,6 @@ import logging
 from itertools import combinations
 
 # Installed libs
-from haversine import Unit, haversine
 from pyomo.common.config import (
     Bool,
     ConfigDict,
@@ -32,8 +31,8 @@ from pyomo.environ import SolverFactory
 # User-defined libs
 from primo.data_parser import WellData
 from primo.opt_model.model_with_clustering import PluggingCampaignModel
-from primo.utils import get_solver
-from primo.utils.clustering_utils import perform_clustering
+from primo.utils import check_optimal_termination, get_solver
+from primo.utils.clustering_utils import distance_matrix, perform_clustering
 from primo.utils.domain_validators import InRange, validate_mobilization_cost
 from primo.utils.raise_exception import raise_exception
 
@@ -147,7 +146,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         # Update the values of all the inputs
         # ConfigDict handles KeyError, other input errors, and domain errors
         LOGGER.info("Processing optimization model inputs.")
-        self.config = self.config(kwargs)
+        self.config = self.CONFIG(kwargs)
 
         # Raise an error if the essential inputs are not provided
         wd = self.config.well_data
@@ -163,8 +162,8 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         # Raise an error if priority scores are not calculated.
         if "Priority Score [0-100]" not in wd:
             msg = (
-                "Unable to find priority scores in the data. Compute the scores using the "
-                "compute_priority_scores method."
+                "Unable to find priority scores in the WellData object. Compute the scores "
+                "using the compute_priority_scores method."
             )
             raise_exception(msg, ValueError)
 
@@ -183,18 +182,9 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
 
         # Step 3: Construct pairwise-metrics between wells in each cluster.
         # Structure: {cluster: {(index_1, index_2): distance_12, ...}...}
-        self.pairwise_distance = {
-            cluster: self._distance_matrix(self.campaign_candidates[cluster])
-            for cluster in set_clusters
-        }
-        self.pairwise_age_difference = {
-            cluster: self._range_matrix(self.campaign_candidates[cluster], "age")
-            for cluster in set_clusters
-        }
-        self.pairwise_depth_difference = {
-            cluster: self._range_matrix(self.campaign_candidates[cluster], "depth")
-            for cluster in set_clusters
-        }
+        self.pairwise_distance = self._pairwise_matrix(metric="distance")
+        self.pairwise_age_difference = self._pairwise_matrix(metric="age")
+        self.pairwise_depth_difference = self._pairwise_matrix(metric="depth")
 
         # Construct owner well count data
         operator_list = set(wd.data[col_names.operator_name])
@@ -235,40 +225,35 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
 
         return self.config.max_cost_project / 1e6
 
-    def _distance_matrix(self, index: list):
-        """Returns pairwise distance for a given set of wells"""
-        wd = self.config.well_data
-        df = wd.data
-        latitude = wd.col_names.latitude
-        longitude = wd.col_names.longitude
-        # TODO: Figure out how to use vector computations
-        return {
-            (j, k): haversine(
-                (df.loc[j, latitude], df.loc[j, longitude]),
-                (df.loc[k, latitude], df.loc[k, longitude]),
-                unit=Unit.MILES,
-            )
-            for j, k in combinations(index, 2)
+    @property
+    def optimization_model(self):
+        """Returns the Pyomo optimization model"""
+        return self._opt_model
+
+    @property
+    def solver(self):
+        """Returns the solver object"""
+        return self._solver
+
+    def _pairwise_matrix(self, metric: str):
+        wd = self.config.well_data  # WellData object
+        # distance_matrix returns a numpy array.
+        metric_array = distance_matrix(wd, {metric: 1})
+
+        # DataFrame index -> metric_array index map
+        df_to_array = {
+            df_index: array_index for array_index, df_index in enumerate(wd.data.index)
         }
 
-    def _range_matrix(self, index: list, column: str):
-        """
-        Returns pairwise difference of a column of interest
-        for a given set of wells
-
-        index : list
-            List of rows/indices in the WellData object
-
-        column : str
-            Allowed columns are "age", "depth"
-        """
-        wd = self.config.well_data
-        df = wd.data
-        column = getattr(wd.col_names, column)
-        # TODO: Figure out how to use vector computations
+        # NOTE: Storing the entire matrix may require a lot of memory.
+        # So, constructing the following dict of dicts
+        # {cluster: {(w1, w2): metric, (w1, w3): metric,...}, ...}
         return {
-            (j, k): abs(df.loc[j, column] - df.loc[k, column])
-            for j, k in combinations(index, 2)
+            cluster: {
+                (w1, w2): metric_array[df_to_array[w1], df_to_array[w2]]
+                for w1, w2 in combinations(well_list, 2)
+            }
+            for cluster, well_list in self.campaign_candidates.items()
         }
 
     def build_optimization_model(self):
@@ -308,53 +293,18 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
             solver.set_gurobi_param("PoolSolutions", pool_size)
 
         # Solve the optimization problem
-        solver.solve(self._opt_model)
+        result = solver.solve(self._opt_model)
 
+        # Check optimal termination. If the solver did not find the optimal
+        # solution, then return None.
+        if not check_optimal_termination(result, solver_name):
+            LOGGER.warning("Solver did not find the optimal solution.")
+            return
+
+        # Return the solution pool, if it is requested
+        if solver_name == "gurobi_persistent" and pool_search_mode == 2:
+            # Return the solution pool if pool_search_mode is active
+            return self._opt_model.get_solution_pool()
+
+        # In all other cases, return the optimal campaign
         return self._opt_model.get_optimal_campaign()
-
-    def get_solution_pool(self):
-        """Extracts solutions from the solution pool"""
-        # pylint: disable=protected-access
-        solver = self._solver
-        pm = self._opt_model  # This is the Pyomo model
-        gm = solver._solver_model  # This is the Gurobipy model
-        # Get Pyomo var to Gurobipy var map.
-        # Gurobi vars can be accessed as py_to_gp[<pyomo var>]
-        pm_to_gm = solver._pyomo_var_to_solver_var_map
-
-        # Return if the pool search mode is not 2
-        if gm.Params.PoolSearchMode != 2 or solver.name != "gurobi_persistent":
-            LOGGER.warning("Pool-search was not used for the solve.")
-            return None
-
-        # Number of solutions found
-        num_solutions = gm.SolCount
-        solution_pool = {}
-
-        for i in range(num_solutions):
-            gm.Params.SolutionNumber = i
-
-            optimal_campaign = {}
-            plugging_cost = {}
-
-            for c in pm.set_clusters:
-                blk = pm.cluster[c]
-                if pm_to_gm[blk.select_cluster].Xn < 0.05:
-                    # Cluster c is not chosen, so continue
-                    continue
-
-                # Wells in cluster c are chosen
-                optimal_campaign[c] = []
-                plugging_cost[c] = pm_to_gm[blk.plugging_cost].Xn
-                for w in blk.set_wells:
-                    if pm_to_gm[blk.select_well[w]].Xn > 0.95:
-                        # Well w is chosen, so store it in the dict
-                        optimal_campaign[c].append(w)
-
-            # Uncomment the following lines after result_parser is merged
-            # solution_pool[i + 1] = OptimalCampaign(
-            #     wd=wd, clusters_dict=optimal_campaign, plugging_cost=plugging_cost
-            # )
-            solution_pool[i + 1] = (optimal_campaign, plugging_cost)
-
-        return solution_pool

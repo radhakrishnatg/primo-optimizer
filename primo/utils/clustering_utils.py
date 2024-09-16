@@ -72,21 +72,39 @@ def distance_matrix(wd: WellData, weights: dict) -> np.ndarray:
     candidates = wd.data
     cn = wd.col_names  # Column names
 
+    # Construct the matrices only if the weights are non-zero
     coordinates = list(zip(candidates[cn.latitude], candidates[cn.longitude]))
-    dist_matrix = haversine_vector(
-        coordinates,
-        coordinates,
-        unit=Unit.MILES,
-        comb=True,
-    )
-    age_range_matrix = np.abs(
-        np.subtract.outer(candidates[cn.age].to_numpy(), candidates[cn.age].to_numpy())
-    )
-    depth_range_matrix = np.abs(
-        np.subtract.outer(
-            candidates[cn.depth].to_numpy(), candidates[cn.depth].to_numpy()
+    dist_matrix = (
+        haversine_vector(
+            coordinates,
+            coordinates,
+            unit=Unit.MILES,
+            comb=True,
         )
+        if wt_dist > 0
+        else 0
     )
+
+    age_range_matrix = (
+        np.abs(
+            np.subtract.outer(
+                candidates[cn.age].to_numpy(), candidates[cn.age].to_numpy()
+            )
+        )
+        if wt_age > 0
+        else 0
+    )
+
+    depth_range_matrix = (
+        np.abs(
+            np.subtract.outer(
+                candidates[cn.depth].to_numpy(), candidates[cn.depth].to_numpy()
+            )
+        )
+        if wt_depth > 0
+        else 0
+    )
+
     return (
         wt_dist * dist_matrix
         + wt_age * age_range_matrix
@@ -122,7 +140,10 @@ def perform_clustering(wd: WellData, distance_threshold: float = 10.0):
 
     # Hard-coding the weights data since this should not be a tunable parameter
     # for users. Move to arguments if it is desired to make it tunable.
-    weights = {"distance": 0.9899, "age": 0.01, "depth": 0.0001}
+    # TODO: Need to scale each metric appropriately. Since good scaling
+    # factors are not available right now, setting the weights of age and depth
+    # as zero.
+    weights = {"distance": 1, "age": 0, "depth": 0}
 
     distance_metric = distance_matrix(wd, weights)
     clustered_data = AgglomerativeClustering(

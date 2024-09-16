@@ -146,7 +146,7 @@ def test_perform_clustering(caplog):
     num_clusters = perform_clustering(wd)
     assert "Clusters" in wd
     assert hasattr(col_names, "cluster")
-    assert num_clusters == 18
+    assert num_clusters == 16
     assert num_clusters == len(set(wd.data["Clusters"]))
 
     assert (
@@ -159,7 +159,7 @@ def test_perform_clustering(caplog):
 
     # Capture the warning if the data has already been clustered
     num_clusters = perform_clustering(wd)
-    assert num_clusters == 18
+    assert num_clusters == 16
 
     assert (
         "Found cluster attribute in the WellDataColumnNames object."
