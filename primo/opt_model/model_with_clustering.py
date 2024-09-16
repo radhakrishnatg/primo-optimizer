@@ -29,9 +29,6 @@ from pyomo.environ import (
     maximize,
 )
 
-# User-defined libs
-from primo.opt_model.model_options import OptModelInputs
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -297,7 +294,7 @@ class PluggingCampaignModel(ConcreteModel):
     Builds the optimization model
     """
 
-    def __init__(self, model_inputs: OptModelInputs, *args, **kwargs):
+    def __init__(self, model_inputs, *args, **kwargs):
         """
         Builds the optimization model for identifying the set of projects that
         maximize the overall impact and/or efficiency of plugging.
