@@ -116,7 +116,7 @@ def build_cluster_model(model_block, cluster):
     model_block.num_wells_chosen.setub(params.config.max_size_project)
 
     # Useful expressions
-    priority_score = wd.data["Priority Score [0-100]"]
+    priority_score = wd["Priority Score [0-100]"]
     model_block.cluster_priority_score = Expression(
         expr=(
             sum(
@@ -236,12 +236,14 @@ class ClusterBlockData(BlockData):
         super().deactivate()
         self.select_cluster.fix(0)
         self.plugging_cost.fix(0)
+        self.num_wells_dac.fix(0)
         self.num_wells_chosen.fix(0)
 
     def activate(self):
         super().activate()
         self.select_cluster.unfix()
         self.plugging_cost.unfix()
+        self.num_wells_dac.unfix()
         self.num_wells_chosen.unfix()
 
     def fix(

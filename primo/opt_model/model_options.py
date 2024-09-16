@@ -174,9 +174,9 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         # Step 2: Identify list of wells belonging to each cluster
         # Structure: {cluster_1: [index_1, index_2,..], cluster_2: [], ...}
         col_names = wd.col_names
-        set_clusters = set(wd.data[col_names.cluster])
+        set_clusters = set(wd[col_names.cluster])
         self.campaign_candidates = {
-            cluster: list(wd.data[wd.data[col_names.cluster] == cluster].index)
+            cluster: list(wd.data[wd[col_names.cluster] == cluster].index)
             for cluster in set_clusters
         }
 
@@ -187,7 +187,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         self.pairwise_depth_difference = self._pairwise_matrix(metric="depth")
 
         # Construct owner well count data
-        operator_list = set(wd.data[col_names.operator_name])
+        operator_list = set(wd[col_names.operator_name])
         self.owner_well_count = {owner: [] for owner in operator_list}
         for well in wd:
             # {Owner 1: [(c1, i2), (c1, i3), (c4, i7), ...], ...}
@@ -299,7 +299,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         # Return the solution pool, if it is requested
         if solver_name == "gurobi_persistent" and pool_search_mode == 2:
             # Return the solution pool if pool_search_mode is active
-            return self._opt_model.get_solution_pool()
+            return self._opt_model.get_solution_pool(self._solver)
 
         # In all other cases, return the optimal campaign
         return self._opt_model.get_optimal_campaign()

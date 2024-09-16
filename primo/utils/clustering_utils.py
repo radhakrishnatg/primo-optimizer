@@ -51,7 +51,7 @@ def distance_matrix(wd: WellData, weights: dict) -> np.ndarray:
     ValueError
         1. if a spurious feature's weight is included apart from
             distance, age, and depth.
-        2. if the sum of feature weights does not equal 1;
+        2. if the sum of feature weights does not equal 1.
     """
 
     # If a feature is not provided, then set its weight to zero
@@ -69,38 +69,23 @@ def distance_matrix(wd: WellData, weights: dict) -> np.ndarray:
     if not np.isclose(wt_dist + wt_depth + wt_age, 1, rtol=0.001):
         raise_exception("Feature weights do not add up to 1.", ValueError)
 
-    candidates = wd.data
-    cn = wd.col_names  # Column names
-
     # Construct the matrices only if the weights are non-zero
-    coordinates = list(zip(candidates[cn.latitude], candidates[cn.longitude]))
+    cn = wd.col_names  # Column names
+    coordinates = list(zip(wd[cn.latitude], wd[cn.longitude]))
     dist_matrix = (
-        haversine_vector(
-            coordinates,
-            coordinates,
-            unit=Unit.MILES,
-            comb=True,
-        )
+        haversine_vector(coordinates, coordinates, unit=Unit.MILES, comb=True)
         if wt_dist > 0
         else 0
     )
 
     age_range_matrix = (
-        np.abs(
-            np.subtract.outer(
-                candidates[cn.age].to_numpy(), candidates[cn.age].to_numpy()
-            )
-        )
+        np.abs(np.subtract.outer(wd[cn.age].to_numpy(), wd[cn.age].to_numpy()))
         if wt_age > 0
         else 0
     )
 
     depth_range_matrix = (
-        np.abs(
-            np.subtract.outer(
-                candidates[cn.depth].to_numpy(), candidates[cn.depth].to_numpy()
-            )
-        )
+        np.abs(np.subtract.outer(wd[cn.depth].to_numpy(), wd[cn.depth].to_numpy()))
         if wt_depth > 0
         else 0
     )
@@ -136,7 +121,7 @@ def perform_clustering(wd: WellData, distance_threshold: float = 10.0):
             "different name for the attribute cluster while instantiating the "
             "WellDataColumnNames object."
         )
-        return len(set(wd.data[wd.col_names.cluster]))
+        return len(set(wd[wd.col_names.cluster]))
 
     # Hard-coding the weights data since this should not be a tunable parameter
     # for users. Move to arguments if it is desired to make it tunable.

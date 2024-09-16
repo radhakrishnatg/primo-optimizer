@@ -37,6 +37,7 @@ MAP_PATH_EXPECTED_HARDCODED_DATA_COUNT = {
     "primo/opt_model/model_with_clustering.py": 16,
     "primo/opt_model/opt_model.py": 15,
     "primo/opt_model/tests/test_base_model.py": 13,
+    "primo/opt_model/tests/test_model_options.py": 129,
     "primo/opt_model/tests/test_opt_model.py": 22,
     "primo/utils/__init__.py": 6,
     "primo/utils/age_depth_estimation.py": 18,
