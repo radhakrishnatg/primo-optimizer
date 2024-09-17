@@ -56,4 +56,4 @@ jobs:
       - name: Run example demo
         shell: bash -el {0}
         run: |
-          pytest -v -m "demo"
+          pytest -v -m "scip"

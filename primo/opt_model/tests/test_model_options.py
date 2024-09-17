@@ -13,7 +13,7 @@
 
 # Standard libs
 import logging
-import os
+import pathlib
 
 # Installed libs
 import numpy as np
@@ -24,7 +24,7 @@ from pyomo.solvers.plugins.solvers.SCIPAMPL import SCIPAMPL
 # User-defined libs
 from primo.data_parser import ImpactMetrics, WellData, WellDataColumnNames
 from primo.opt_model.model_options import OptModelInputs
-from primo.opt_model.model_with_clustering import (
+from primo.opt_model.model_with_clustering import (  # pylint: disable=no-name-in-module
     IndexedClusterBlock,
     PluggingCampaignModel,
 )
@@ -87,12 +87,13 @@ def get_column_names_fixture():
         },
     )
 
-    filename = os.path.dirname(os.path.realpath(__file__))[:-16]  # Primo folder
-    filename += r"/demo/Example_1_data.csv"
+    current_file = pathlib.Path(__file__).resolve()
+    # primo folder is 2 levels up the current folder
+    data_file = str(current_file.parents[2].joinpath("demo", "Example_1_data.csv"))
+    return im_metrics, col_names, data_file
 
-    return im_metrics, col_names, filename
 
-
+@pytest.mark.scip
 def test_opt_model_inputs(get_column_names):
     im_metrics, col_names, filename = get_column_names
 
@@ -173,8 +174,8 @@ def test_opt_model_inputs(get_column_names):
         scaled_mobilization_cost[n_wells] = n_wells * 0.084
 
     get_mobilization_cost = opt_mdl_inputs.get_mobilization_cost
-    for well in scaled_mobilization_cost:
-        assert np.isclose(get_mobilization_cost[well], scaled_mobilization_cost[well])
+    for well, cost in scaled_mobilization_cost.items():
+        assert np.isclose(get_mobilization_cost[well], cost)
 
     assert isinstance(opt_mdl, PluggingCampaignModel)
     assert isinstance(solver, SCIPAMPL)
@@ -276,6 +277,7 @@ def test_opt_model_inputs(get_column_names):
         assert opt_mdl.cluster[1].select_well[j].value == 1
 
 
+@pytest.mark.scip
 def test_incremental_formulation(get_column_names):
     im_metrics, col_names, filename = get_column_names
 
