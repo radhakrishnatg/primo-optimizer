@@ -23,6 +23,7 @@ from pyomo.environ import (
     Constraint,
     Expression,
     NonNegativeReals,
+    NonNegativeIntegers,
     Objective,
     Param,
     Set,
@@ -43,8 +44,15 @@ def build_cluster_model(model_block, cluster):
     wd = params.config.well_data
     well_index = params.campaign_candidates[cluster]
     pairwise_distance = params.pairwise_distance[cluster]
-    # pairwise_age_range = params.pairwise_age_range[c]
-    # pairwise_depth_range = params.pairwise_depth_range[c]
+    (
+        max_dist_road,
+        max_elev_delta,
+        max_size_project,
+        max_unique_owners,
+        max_age_range,
+        max_depth_range,
+        max_rec_comp,
+    ) = params.get_eff_scaling_factors
 
     # Get well pairs which violate the distance threshold
     well_dac = []
@@ -98,10 +106,24 @@ def build_cluster_model(model_block, cluster):
         within=NonNegativeReals,
         doc="Total cost for plugging wells in this cluster",
     )
+    model_block.eff_num_wells = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_age_range = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_depth_range = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_dist_road = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_elev_delta = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_unique_owner = Var(within=NonNegativeIntegers, doc="")
+
+    model_block.eff_rec_comp = Var(within=NonNegativeIntegers, doc="")
 
     # Although the following two variables are of type Integer, they
     # can be declared as continuous. The optimal solution is guaranteed to have
     # integer values.
+
     model_block.num_wells_chosen = Var(
         within=NonNegativeReals,
         doc="Total number of wells chosen in the project",
@@ -125,6 +147,20 @@ def build_cluster_model(model_block, cluster):
             )
         ),
         doc="Computes the total priority score for the cluster",
+    )
+
+    pairwise_age_range = params.pairwise_age_range[cluster]
+    model_block.pairwise_age_range = Param(
+        model_block.set_well_pairs_keep,
+        initialize=pairwise_age_range,
+        doc="Pairwise age range for well pairs in the cluster.",
+    )
+
+    pairwise_depth_range = params.pairwise_depth_range[cluster]
+    model_block.pairwise_depth_range = Param(
+        model_block.set_well_pairs_keep,
+        initialize=pairwise_depth_range,
+        doc="Pairwise depth range for well pairs in the cluster.",
     )
 
     # Essential constraints
@@ -175,6 +211,82 @@ def build_cluster_model(model_block, cluster):
         ),
         doc="Ensures at most one num_wells_var is selected",
     )
+
+    model_block.eff_num_wells = Constraint(
+        expr=(
+            model_block.eff_num_wells == model_block.num_wells_chosen / max_size_project
+        )
+    )
+
+    @model_block.Constraint(
+        model_block.set_well_pairs_keep,
+        doc="Age range constraint for well pairs in the set_well_pairs_keep",
+    )
+    def age_range(model_block, w1, w2):
+        cluster = model_block.parent_block().cluster
+        return (
+            1 - model_block.eff_age_range
+            >= model_block.pairwise_age_range[w1, w2]
+            * (model_block.select_well[w1] + model_block.select_well[w2] - 1)
+            / max_age_range
+        )
+
+    @model_block.Constraint(
+        model_block.set_well_pairs_keep,
+        doc="Depth range constraint for well pairs in the set_well_pairs_keep",
+    )
+    def depth_range_rule(model_block, w1, w2):
+        cluster = model_block.parent_block().cluster
+        return (
+            1 - model_block.eff_depth_range
+            >= model_block.pairwise_depth_range[w1, w2]
+            * (model_block.select_well[w1] + model_block.select_well[w2] - 1)
+            / max_depth_range
+        )
+
+    @model_block.Constraint(
+        model_block.set_wells, doc="Distance to road constraint for all wells"
+    )
+    def dist_road_rule(model_block, w1):
+        cluster = model_block.parent_block().cluster
+        return (
+            1 - model_block.eff_dist_road
+            >= model_block.dist_road[w1] * (model_block.select_well[w1]) / max_dist_road
+        )
+
+    @model_block.Constraint(
+        model_block.set_wells, doc="Elevation Delta constraint for all wells"
+    )
+    def elev_delta_rule(model_block, w1):
+        cluster = model_block.parent_block().cluster
+        return (
+            1 - model_block.eff_elev_delta
+            >= model_block.elev_delta[w1]
+            * (model_block.select_well[w1])
+            / max_elev_delta
+        )
+
+    @model_block.Constraint(
+        model_block.set_wells, doc="Unique Owner constraint for all wells"
+    )
+    def unique_owner_rule(model_block, w1):
+        cluster = model_block.parent_block().cluster
+        return (
+            1 - model_block.eff_unique_owner
+            >= model_block.unique_owner[w1]
+            * (model_block.select_well[w1])
+            / max_unique_owners
+        )
+
+    @model_block.Constraint(
+        model_block.set_wells, doc="Unique Owner constraint for all wells"
+    )
+    def rec_comp_rule(model_block, w1):
+        cluster = model_block.parent_block().cluster
+        return (
+            model_block.eff_rec_comp
+            <= model_block.rec_comp[w1] * (model_block.select_well[w1]) / max_rec_comp
+        )
 
 
 def num_wells_incremental_formulation(model_block):
