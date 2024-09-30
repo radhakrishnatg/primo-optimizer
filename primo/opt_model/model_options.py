@@ -30,7 +30,7 @@ from pyomo.environ import SolverFactory
 
 # User-defined libs
 from primo.data_parser import WellData
-from primo.opt_model.model_with_clustering import PluggingCampaignModel
+from primo.opt_model.without_clustering_modified import PluggingCampaignModel
 from primo.utils import check_optimal_termination, get_solver
 from primo.utils.clustering_utils import distance_matrix, perform_clustering
 from primo.utils.domain_validators import InRange, validate_mobilization_cost
@@ -127,6 +127,54 @@ def model_config() -> ConfigDict:
             default=False,
             domain=Bool,
             doc="If True, some constraints will be added as lazy constraints",
+        ),
+    )
+
+    config.declare(
+        "max_distance_to_road",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Maximum Distance to road of wells selected in the project",
+        ),
+    )
+
+    config.declare(
+        "max_elevation_delta",
+        ConfigValue(
+            domain=float,
+            doc="Maximum Elevation delta from closest road point of wells selected in the project",
+        ),
+    )
+
+    config.declare(
+        "max_number_of_unique_owners",
+        ConfigValue(
+            domain=NonNegativeInt,
+            doc="Maximum Number of unique owners in the selected project",
+        ),
+    )
+
+    config.declare(
+        "max_age_range",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Maximum Age range of wells in the project",
+        ),
+    )
+
+    config.declare(
+        "max_depth_range",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Maximum Depth range of wells in the project",
+        ),
+    )
+
+    config.declare(
+        "record_completeness",
+        ConfigValue(
+            domain=InRange(0, 100),
+            doc="Record completeness of wells in well data",
         ),
     )
 
@@ -263,6 +311,49 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         LOGGER.info("Completed the construction of the optimization model.")
         return self._opt_model
 
+    def get_eff_scaling_factors(self):
+        """Returns scaling factors for efficiency metrics to be used in the opt model"""
+        LOGGER.info("Beginning to calculate the scaling factors for efficiency metrics")
+        wd = self.config.well_data
+        if self.config.max_distance_to_road == None:
+            self.config.max_distance_to_road = max(wd["Distance to Road [miles]"])
+
+        if self.config.max_elevation_delta == None:
+            self.config.max_elevation_delta = max(wd["Elevation Delta [m]"])
+
+        if self.config.max_size_project == None:
+            self.config.max_size_project = 20
+
+        if self.config.max_number_of_unique_owners == None:
+            self.config.max_number_of_unique_owners = 20
+
+        if self.config.max_age_range == None:
+            self.config.max_age_range = max(
+                max(inner_dict.values())
+                for inner_dict in self.pairwise_age_difference.values()
+            )
+
+        if self.config.max_depth_range == None:
+            self.config.max_depth_range = max(
+                max(inner_dict.values())
+                for inner_dict in self.pairwise_depth_difference.values()
+            )
+
+        if self.config.max_record_completeness == None:
+            self.config.max_record_completeness = max(wd["Record Completeness"])
+
+        LOGGER.info("Completed calculating the scaling factors for efficiency metrics")
+
+        return (
+            self.config.max_distance_to_road,
+            self.config.max_elevation_delta,
+            self.config.max_size_project,
+            self.config.max_number_of_unique_owners,
+            self.config.max_age_range,
+            self.config.max_depth_range,
+            self.config.max_record_completeness,
+        )
+
     def solve_model(self, **kwargs):
         """Solves the optimization"""
 
@@ -294,7 +385,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
             solver.set_gurobi_param("PoolSolutions", pool_size)
 
         # Solve the optimization problem
-        solver.solve(self._opt_model)
+        solver.solve(self._opt_model, tee=kwargs.pop("stream_output", True))
 
         # Return the solution pool, if it is requested
         if solver_name == "gurobi_persistent" and pool_search_mode == 2:
