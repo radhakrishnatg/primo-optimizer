@@ -206,13 +206,15 @@ def build_cluster_model(model_block, cluster):
 
     model_block.eff_elev_delta = Var(within=NonNegativeReals, doc="")
 
-    model_block.eff_unique_owner = Var(within=NonNegativeIntegers, doc="")
+    model_block.eff_unique_owner = Var(within=NonNegativeReals, doc="")
 
-    model_block.eff_rec_comp = Var(within=NonNegativeIntegers, doc="")
+    model_block.eff_rec_comp = Var(within=NonNegativeReals, doc="")
 
     model_block.eff_pop_den = Var(within=NonNegativeReals, doc="")
 
-    model_block.eff_max_dist = Var(within=NonNegativeReals, doc="")
+    model_block.eff_max_dist = Var(
+        within=NonNegativeReals, doc=""
+    )  # change to dist_range
 
     model_block.eff_age_depth_dist = Var(within=NonNegativeReals, doc="")
 
@@ -227,6 +229,7 @@ def build_cluster_model(model_block, cluster):
     max_rec_comp = params.config.record_completeness
     max_pop_den = params.config.max_population_density
     max_well_dist = params.config.max_well_distance
+    max_num_proj = params.config.max_num_project
 
     eff_metrics = wd.efficiency_metrics
     w_age_range = eff_metrics.age_range.effective_weight
@@ -255,8 +258,6 @@ def build_cluster_model(model_block, cluster):
         return (
             w_age_range + w_depth_range + w_well_dist
         ) * model_block.select_cluster - model_block.eff_age_depth_distance >= (
-            w_age_range + w_depth_range + w_well_dist
-        ) * (
             model_block.select_well[w1]
             + model_block.select_well[w2]
             - model_block.select_cluster
@@ -279,8 +280,6 @@ def build_cluster_model(model_block, cluster):
         return (
             w_pop_den + w_dist_road + w_elev_delta
         ) * model_block.select_cluster - model_block.eff_pop_road_elev >= (
-            w_pop_den + w_dist_road + w_elev_delta
-        ) * (
             model_block.select_well[w] - model_block.select_cluster
         ) * (
             (w_pop_den * wd.col_names.population_density[w] / max_pop_den)
@@ -300,6 +299,8 @@ def build_cluster_model(model_block, cluster):
     #         / max_unique_owners
     #     )
 
+    ## TODO: Add constraint for max number of projects
+
     @model_block.Constraint(
         model_block.set_wells, doc="Unique Owner constraint for all wells"
     )
@@ -307,6 +308,16 @@ def build_cluster_model(model_block, cluster):
         cluster = model_block.parent_block().cluster
         return model_block.eff_rec_comp <= w_rec_comp * (
             model_block.rec_comp[w1] * (model_block.select_well[w1]) / max_rec_comp
+        )
+
+    @model_block.Constraint(doc="Maximum number of projects constraint")
+    def max_proj_rule(model_block):
+        return (
+            sum(
+                model_block.select_cluster[i]
+                for i in model_block.parent_block().cluster
+            )
+            <= max_num_proj
         )
 
 

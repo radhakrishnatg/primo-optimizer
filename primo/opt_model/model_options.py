@@ -30,7 +30,7 @@ from pyomo.environ import SolverFactory
 
 # User-defined libs
 from primo.data_parser import WellData
-from primo.opt_model.without_clustering_modified import PluggingCampaignModel
+from primo.opt_model.model_with_clustering import PluggingCampaignModel
 from primo.utils import check_optimal_termination, get_solver
 from primo.utils.clustering_utils import distance_matrix, perform_clustering
 from primo.utils.domain_validators import InRange, validate_mobilization_cost
@@ -204,6 +204,13 @@ def model_config() -> ConfigDict:
         ConfigValue(
             domain=NonNegativeFloat,
             doc="population density of wells in well data",
+        ),
+    )
+    config.declare(
+        "max_num_project",
+        ConfigValue(
+            domain=NonNegativeInt,
+            doc="Maximum number of projects",
         ),
     )
     return config
