@@ -44,15 +44,6 @@ def build_cluster_model(model_block, cluster):
     wd = params.config.well_data
     well_index = params.campaign_candidates[cluster]
     pairwise_distance = params.pairwise_distance[cluster]
-    (
-        max_dist_road,
-        max_elev_delta,
-        max_size_project,
-        max_unique_owners,
-        max_age_range,
-        max_depth_range,
-        max_rec_comp,
-    ) = params.get_eff_scaling_factors
 
     # Get well pairs which violate the distance threshold
     well_dac = []
@@ -106,19 +97,6 @@ def build_cluster_model(model_block, cluster):
         within=NonNegativeReals,
         doc="Total cost for plugging wells in this cluster",
     )
-    model_block.eff_num_wells = Var(within=NonNegativeReals, doc="")
-
-    model_block.eff_age_range = Var(within=NonNegativeReals, doc="")
-
-    model_block.eff_depth_range = Var(within=NonNegativeReals, doc="")
-
-    model_block.eff_dist_road = Var(within=NonNegativeReals, doc="")
-
-    model_block.eff_elev_delta = Var(within=NonNegativeReals, doc="")
-
-    model_block.eff_unique_owner = Var(within=NonNegativeIntegers, doc="")
-
-    model_block.eff_rec_comp = Var(within=NonNegativeIntegers, doc="")
 
     # Although the following two variables are of type Integer, they
     # can be declared as continuous. The optimal solution is guaranteed to have
@@ -212,80 +190,123 @@ def build_cluster_model(model_block, cluster):
         doc="Ensures at most one num_wells_var is selected",
     )
 
+    if params.config.objective_type == "Impact":
+        return
+    else:
+        pass
+
+    #### Efficiency terms
+    model_block.eff_num_wells = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_age_range = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_depth_range = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_dist_road = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_elev_delta = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_unique_owner = Var(within=NonNegativeIntegers, doc="")
+
+    model_block.eff_rec_comp = Var(within=NonNegativeIntegers, doc="")
+
+    model_block.eff_pop_den = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_max_dist = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_age_depth_dist = Var(within=NonNegativeReals, doc="")
+
+    model_block.eff_pop_road_elev = Var(within=NonNegativeReals, doc="")
+
+    max_dist_road = params.config.max_distance_to_road
+    max_elev_delta = params.config.max_elevation_delta
+    max_size_project = params.config.max_size_project
+    max_unique_owners = params.config.max_number_of_unique_owners
+    max_age_range = params.config.max_age_range
+    max_depth_range = params.config.max_depth_range
+    max_rec_comp = params.config.record_completeness
+    max_pop_den = params.config.max_population_density
+    max_well_dist = params.config.max_well_distance
+
+    eff_metrics = wd.efficiency_metrics
+    w_age_range = eff_metrics.age_range.effective_weight
+    w_depth_range = eff_metrics.depth_range.effective_weight
+    w_rec_comp = eff_metrics.rec_comp.effective_weight
+    w_pop_den = eff_metrics.pop_den.effective_weight
+    w_well_dist = eff_metrics.well_dist.effective_weight
+    w_unique_owners = eff_metrics.unique_owners.effective_weight
+    w_num_wells = eff_metrics.num_wells.effective_weight
+    w_elev_delta = eff_metrics.elev_delta.effective_weight
+    w_dist_road = eff_metrics.dist_road.effective_weight
+
     model_block.eff_num_wells = Constraint(
         expr=(
-            model_block.eff_num_wells == model_block.num_wells_chosen / max_size_project
+            model_block.eff_num_wells
+            == w_num_wells * (model_block.num_wells_chosen / max_size_project)
         )
     )
 
     @model_block.Constraint(
         model_block.set_well_pairs_keep,
-        doc="Age range constraint for well pairs in the set_well_pairs_keep",
+        doc="Combined constraint for age, depth, distance",
     )
-    def age_range(model_block, w1, w2):
+    def rule(model_block, w1, w2):
         cluster = model_block.parent_block().cluster
         return (
-            1 - model_block.eff_age_range
-            >= model_block.pairwise_age_range[w1, w2]
-            * (model_block.select_well[w1] + model_block.select_well[w2] - 1)
-            / max_age_range
+            w_age_range + w_depth_range + w_well_dist
+        ) * model_block.select_cluster - model_block.eff_age_depth_distance >= (
+            w_age_range + w_depth_range + w_well_dist
+        ) * (
+            model_block.select_well[w1]
+            + model_block.select_well[w2]
+            - model_block.select_cluster
+        ) * (
+            (w_age_range * model_block.pairwise_age_range[w1, w2] / max_age_range)
+            + (
+                w_depth_range
+                * model_block.pairwise_depth_range[w1, w2]
+                / max_depth_range
+            )
+            + (w_well_dist * model_block.pairwise_dist[w1, w2] / max_well_dist)
         )
 
     @model_block.Constraint(
-        model_block.set_well_pairs_keep,
-        doc="Depth range constraint for well pairs in the set_well_pairs_keep",
+        model_block.set_wells,
+        doc="Combined constraint for popoulation density, distance to road, elevation",
     )
-    def depth_range_rule(model_block, w1, w2):
+    def rule(model_block, w):
         cluster = model_block.parent_block().cluster
         return (
-            1 - model_block.eff_depth_range
-            >= model_block.pairwise_depth_range[w1, w2]
-            * (model_block.select_well[w1] + model_block.select_well[w2] - 1)
-            / max_depth_range
+            w_pop_den + w_dist_road + w_elev_delta
+        ) * model_block.select_cluster - model_block.eff_pop_road_elev >= (
+            w_pop_den + w_dist_road + w_elev_delta
+        ) * (
+            model_block.select_well[w] - model_block.select_cluster
+        ) * (
+            (w_pop_den * wd.col_names.population_density[w] / max_pop_den)
+            + (w_dist_road * wd.col_names.dist_road[w] / max_dist_road)
+            + (w_elev_delta * wd.col_names.elevation_delta[w] / max_elev_delta)
         )
 
-    @model_block.Constraint(
-        model_block.set_wells, doc="Distance to road constraint for all wells"
-    )
-    def dist_road_rule(model_block, w1):
-        cluster = model_block.parent_block().cluster
-        return (
-            1 - model_block.eff_dist_road
-            >= model_block.dist_road[w1] * (model_block.select_well[w1]) / max_dist_road
-        )
-
-    @model_block.Constraint(
-        model_block.set_wells, doc="Elevation Delta constraint for all wells"
-    )
-    def elev_delta_rule(model_block, w1):
-        cluster = model_block.parent_block().cluster
-        return (
-            1 - model_block.eff_elev_delta
-            >= model_block.elev_delta[w1]
-            * (model_block.select_well[w1])
-            / max_elev_delta
-        )
-
-    @model_block.Constraint(
-        model_block.set_wells, doc="Unique Owner constraint for all wells"
-    )
-    def unique_owner_rule(model_block, w1):
-        cluster = model_block.parent_block().cluster
-        return (
-            1 - model_block.eff_unique_owner
-            >= model_block.unique_owner[w1]
-            * (model_block.select_well[w1])
-            / max_unique_owners
-        )
+    # @model_block.Constraint(
+    #     model_block.set_wells, doc="Unique Owner constraint for all wells"
+    # )
+    # def unique_owner_rule(model_block, w1):
+    #     cluster = model_block.parent_block().cluster
+    #     return (
+    #         1 - model_block.eff_unique_owner
+    #         >= model_block.unique_owner[w1]
+    #         * (model_block.select_well[w1])
+    #         / max_unique_owners
+    #     )
 
     @model_block.Constraint(
         model_block.set_wells, doc="Unique Owner constraint for all wells"
     )
     def rec_comp_rule(model_block, w1):
         cluster = model_block.parent_block().cluster
-        return (
-            model_block.eff_rec_comp
-            <= model_block.rec_comp[w1] * (model_block.select_well[w1]) / max_rec_comp
+        return model_block.eff_rec_comp <= w_rec_comp * (
+            model_block.rec_comp[w1] * (model_block.select_well[w1]) / max_rec_comp
         )
 
 

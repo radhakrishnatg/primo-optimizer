@@ -49,6 +49,21 @@ def model_config() -> ConfigDict:
     # ConfigValue automatically performs domain validation.
     config = ConfigDict()
     config.declare(
+        "objective_type",
+        ConfigValue(
+            default="Impact",
+            domain=In(["Impact", "Efficiency", "Combined"]),
+            doc="Objective Type",
+        ),
+    )
+    config.declare(
+        "objective_weight_impact",
+        ConfigValue(
+            domain=InRange(0, 100),
+            doc="Weight of Impact in Objective Function",
+        ),
+    )
+    config.declare(
         "well_data",
         ConfigValue(
             domain=IsInstance(WellData),
@@ -177,7 +192,20 @@ def model_config() -> ConfigDict:
             doc="Record completeness of wells in well data",
         ),
     )
-
+    config.declare(
+        "max_well_distance",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Maximum Pairwise distance of wells in well data",
+        ),
+    )
+    config.declare(
+        "max_population_density",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="population density of wells in well data",
+        ),
+    )
     return config
 
 
@@ -218,6 +246,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         # Construct campaign candidates
         # Step 1: Perform clustering, Should distance_threshold be a user argument?
         perform_clustering(wd, distance_threshold=10.0)
+        self.get_eff_scaling_factors()
 
         # Step 2: Identify list of wells belonging to each cluster
         # Structure: {cluster_1: [index_1, index_2,..], cluster_2: [], ...}
@@ -314,45 +343,94 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
     def get_eff_scaling_factors(self):
         """Returns scaling factors for efficiency metrics to be used in the opt model"""
         LOGGER.info("Beginning to calculate the scaling factors for efficiency metrics")
-        wd = self.config.well_data
-        if self.config.max_distance_to_road == None:
-            self.config.max_distance_to_road = max(wd["Distance to Road [miles]"])
-
-        if self.config.max_elevation_delta == None:
-            self.config.max_elevation_delta = max(wd["Elevation Delta [m]"])
-
-        if self.config.max_size_project == None:
-            self.config.max_size_project = 20
-
-        if self.config.max_number_of_unique_owners == None:
-            self.config.max_number_of_unique_owners = 20
-
-        if self.config.max_age_range == None:
-            self.config.max_age_range = max(
-                max(inner_dict.values())
-                for inner_dict in self.pairwise_age_difference.values()
+        if self.config.objective_type == "Efficiency" or "Combined":
+            eff_metrics = wd.efficiency_metrics
+            wd = self.config.well_data
+            if (
+                self.config.max_distance_to_road == None
+                and eff_metrics.dist_road.effective_weight > 0
+            ):
+                self.config.max_distance_to_road = max(wd["Distance to Road [miles]"])
+                LOGGER.info(
+                    f"Maximum distance to road not provided, setting it to {max(wd['Distance to Road [miles]'])}"
+                )
+            if (
+                self.config.max_elevation_delta == None
+                and eff_metrics.elev_delta.effective_weight > 0
+            ):
+                self.config.max_elevation_delta = max(wd["Elevation Delta [m]"])
+                LOGGER.warning(
+                    f"Maximum elevation delta not provided, setting it to {max(wd['Elevation Delta [m]'])}"
+                )
+            if (
+                self.config.max_size_project == None
+                and eff_metrics.num_wells.effective_weight > 0
+            ):
+                self.config.max_size_project = 20
+                LOGGER.warning(f"Maximum project size not provided, setting it to {20}")
+            if (
+                self.config.max_number_of_unique_owners == None
+                and eff_metrics.num_unique_owners.effective_weight > 0
+            ):
+                self.config.max_number_of_unique_owners = 20
+                LOGGER.warning(
+                    f"Maximum number of unique owners not provided, setting it to {20}"
+                )
+            if (
+                self.config.max_age_range == None
+                and eff_metrics.age_range.effective_weight > 0
+            ):
+                self.config.max_age_range = max(
+                    max(inner_dict.values())
+                    for inner_dict in self.pairwise_age_difference.values()
+                )
+                LOGGER.warning(
+                    f"Maximum age range not provided, setting it to {self.config.max_age_range}"
+                )
+            if (
+                self.config.max_depth_range == None
+                and eff_metrics.depth_range.effective_weight > 0
+            ):
+                self.config.max_depth_range = max(
+                    max(inner_dict.values())
+                    for inner_dict in self.pairwise_depth_difference.values()
+                )
+                LOGGER.warning(
+                    f"Maximum depth range not provided, setting it to {self.config.max_depth_range}"
+                )
+            if (
+                self.config.max_well_distance == None
+                and eff_metrics.well_distance.effective_weight > 0
+            ):
+                self.config.max_well_distance = max(
+                    max(inner_dict.values())
+                    for inner_dict in self.pairwise_distance.values()
+                )
+                LOGGER.warning(
+                    f"Maximum pairwise distance not provided, setting it to {self.config.max_well_distance}"
+                )
+            if (
+                self.config.max_record_completeness == None
+                and eff_metrics.rec_comp.effective_weight > 0
+            ):
+                self.config.max_record_completeness = max(wd["Record Completeness"])
+                LOGGER.warning(
+                    f"Maximum record completeness not provided, setting it to {max(wd['Record Completeness'])}"
+                )
+            if (
+                self.config.max_population_density == None
+                and eff_metrics.pop_den.effective_weight > 0
+            ):
+                self.config.max_population_density = max(wd["Population Density"])
+                LOGGER.warning(
+                    f"Maximum population density not provided, setting it to {max(wd['Population Density'])}"
+                )
+            LOGGER.info(
+                "Completed calculating the scaling factors for efficiency metrics"
             )
-
-        if self.config.max_depth_range == None:
-            self.config.max_depth_range = max(
-                max(inner_dict.values())
-                for inner_dict in self.pairwise_depth_difference.values()
-            )
-
-        if self.config.max_record_completeness == None:
-            self.config.max_record_completeness = max(wd["Record Completeness"])
-
-        LOGGER.info("Completed calculating the scaling factors for efficiency metrics")
-
-        return (
-            self.config.max_distance_to_road,
-            self.config.max_elevation_delta,
-            self.config.max_size_project,
-            self.config.max_number_of_unique_owners,
-            self.config.max_age_range,
-            self.config.max_depth_range,
-            self.config.max_record_completeness,
-        )
+        else:
+            return
+        return
 
     def solve_model(self, **kwargs):
         """Solves the optimization"""
