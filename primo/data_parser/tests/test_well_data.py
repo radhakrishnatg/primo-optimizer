@@ -595,8 +595,8 @@ def test_compute_priority_scores(
         ((998.22 - 511.4) / 998.22) * im_metrics.ann_oil_production.effective_weight,
     )
 
-    # Test errors thrown by the method
-    # with efficiency refactoring, the priority score is added as an attribute to the well column name object
+    # Test errors thrown by the method with efficiency refactoring,
+    # the priority score is added as an attribute to the well column name object
     wd_df = pd.read_csv(
         filename, usecols=[col for col in col_names.values() if "Priority" not in col]
     )
