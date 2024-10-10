@@ -317,9 +317,13 @@ class PluggingCampaignModel(ConcreteModel):
         self.cluster = ClusterBlock(self.set_clusters, rule=build_cluster_model)
 
         # Define slack variable for unutilized budget
+
         self.unused_budget = Var(
             within=NonNegativeReals,
             doc="Unused budget from the total budget",
+        self.budget_slack_var = Var(
+            within=NonNegativeReals,
+            doc="Slack variable for the unutilized amount of total budget",
         )
 
         # Add total budget constraint
@@ -332,10 +336,20 @@ class PluggingCampaignModel(ConcreteModel):
             doc="Total cost of plugging must be within the total budget",
         )
 
+
         if model_inputs.objective_type in ["Efficiency", "Combined"]:
             LOGGER.info("Building the efficiency model.")
             for c in self.set_clusters:
                 build_efficiency_model(self.cluster[c], cluster=c)
+        # Add a constraint to calculate the unutilized amount of budget
+        self.budget_constraint_slack = Constraint(
+            expr=(
+                self.total_budget
+                - sum(self.cluster[c].plugging_cost for c in self.set_clusters)
+                <= self.budget_slack_var
+            ),
+            doc="Calculate the unutilized amount of budget",
+        )
 
         # Add optional constraints:
         if model_inputs.config.perc_wells_in_dac is not None:
@@ -435,6 +449,10 @@ class PluggingCampaignModel(ConcreteModel):
                 for w in self.cluster[c].set_wells
             )
             - self.slack_var_scaling * self.unused_budget,
+            expr=(
+                sum(self.cluster[c].cluster_priority_score for c in self.set_clusters)
+                - self.slack_var_scaling * self.budget_slack_var
+            ),
             sense=maximize,
             doc="Total Priority score minus scaled slack variable for unutilized budget",
         )

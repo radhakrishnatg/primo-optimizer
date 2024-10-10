@@ -165,6 +165,14 @@ def model_config() -> ConfigDict:
             ),
         ),
     )
+    config.declare(
+        "min_budget_usage",
+        ConfigValue(
+            default=None,
+            domain=InRange(0, 100),
+            doc="The minimum percent of the budget usage when the budget is insufficient for plugging all wells",
+        ),
+    )
 
     # Parameters for computing efficiency metrics
     config.declare(

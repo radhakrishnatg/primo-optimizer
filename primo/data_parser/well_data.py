@@ -24,7 +24,7 @@ import pandas as pd
 from pyomo.common.config import Bool, document_kwargs_from_configdict
 
 # User-defined libs
-from primo.data_parser import EfficiencyMetrics, ImpactMetrics, SetOfMetrics
+from primo.data_parser import EfficiencyMetrics, ImpactMetrics, Metric, SetOfMetrics
 from primo.data_parser.default_data import CONVERSION_FACTOR
 from primo.data_parser.input_config import data_config
 from primo.data_parser.well_data_columns import WellDataColumnNames
@@ -33,6 +33,8 @@ from primo.utils.raise_exception import raise_exception
 LOGGER = logging.getLogger(__name__)
 
 CONFIG = data_config()
+OWNER_WELL_COLUMN_NAME = "Owner Well-Count"
+
 OWNER_WELL_COLUMN_NAME = "Owner Well-Count"
 
 
@@ -867,6 +869,13 @@ class WellData:
 
         LOGGER.info("Completed processing the essential inputs.")
 
+    def _append_fed_dac_data(self):
+        """Appends federal DAC data"""
+        census_year = self.config.census_year
+        # TODO:
+        # Append Tract ID/GEOID, population density, Total population, land area,
+        # federal DAC score to the DataFrame
+
     def _set_metric(self, metrics: SetOfMetrics):
         """
         Validates and processes data for a set of metrics
@@ -981,6 +990,7 @@ class WellData:
         the total priority score. This method must be called after processing the
         data for custom metrics (if any).
         """
+
         for metric in self.config.impact_metrics:
             if metric.weight == 0 or hasattr(metric, "submetrics"):
                 # Metric/submetric is not chosen, or
